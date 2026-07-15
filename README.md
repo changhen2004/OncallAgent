@@ -260,8 +260,8 @@ docker compose up --build
 
 访问地址：
 
-- Backend: `http://localhost:3000`
-- Metrics: `http://localhost:3000/metrics`
+- Backend: `http://localhost:8080`
+- Metrics: `http://localhost:8080/metrics`
 - Prometheus: `http://localhost:9091`
 - Grafana: `http://localhost:3001`
 
