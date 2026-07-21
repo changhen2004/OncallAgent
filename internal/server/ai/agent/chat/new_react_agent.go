@@ -21,7 +21,7 @@ func (u chatServer) newReactAgentLambda(ctx context.Context) (node *compose.Lamb
 	if err != nil {
 		return nil, err
 	}
-	retrieveTool, err := tools.RetrieveTool()
+	retrieveTool, err := tools.RetrieveTool(u.retriever)
 	if err != nil {
 		return nil, err
 	}

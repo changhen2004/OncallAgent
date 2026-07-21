@@ -14,18 +14,13 @@ import (
 )
 
 func NewExecuteAgent(ctx context.Context, model *openai.ChatModel, cfg *config.Config, retriever *qdrant_retriever.Retriever) (adk.Agent, error) {
-	// 初始化 RAG 工具
-	if retriever != nil {
-		tools.InitRAGTool(retriever)
-	}
-
 	toolls := make([]tool.BaseTool, 0)
 	timeTool, err := tools.TimeTool(ctx)
 	if err != nil {
 		return nil, err
 	}
 	toolls = append(toolls, timeTool)
-	retrieveTool, err := tools.RetrieveTool()
+	retrieveTool, err := tools.RetrieveTool(retriever)
 	if err != nil {
 		return nil, err
 	}
