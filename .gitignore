@@ -4,6 +4,12 @@
 
 # Dependencies
 /vendor/
+.venv/
+
+# Python
+__pycache__/
+.pytest_cache/
+*.py[cod]
 
 # IDE
 .idea/
