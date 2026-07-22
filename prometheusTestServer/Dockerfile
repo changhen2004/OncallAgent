@@ -1,17 +1,12 @@
-FROM golang:alpine AS builder
+FROM python:3.12-alpine
 
 WORKDIR /app
-# We don't have go.mod in prometheusTestServer, wait, does it use the root go.mod?
-# The root go.mod has the prometheus client. But we only need to build main.go.
-# We can just copy the whole project or just the test server.
-# Let's copy the whole root so we have go.mod, then build inside prometheusTestServer.
 
-COPY . .
-WORKDIR /app/prometheusTestServer
-RUN CGO_ENABLED=0 GOOS=linux GOPROXY=https://goproxy.cn,direct go build -o testserver main.go
+COPY pyproject.toml uv.lock ./
+RUN pip install --no-cache-dir uv \
+    && uv sync --frozen --no-dev --no-install-project
 
-FROM alpine:latest
-WORKDIR /app
-COPY --from=builder /app/prometheusTestServer/testserver .
+COPY prometheusTestServer ./prometheusTestServer
+
 EXPOSE 2112
-CMD ["./testserver"]
+CMD [".venv/bin/python", "prometheusTestServer/main.py"]
