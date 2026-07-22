@@ -108,7 +108,7 @@ def simulate_metrics_once(
     rng: random.Random | None = None,
 ) -> None:
     now = now or datetime.now()
-    rng = rng or random
+    rng = rng or random.Random(now.timestamp())
     scenario = current_scenario(now)
     LOGGER.info("[%s] 当前场景: %s", now.strftime("%H:%M:%S"), scenario.value)
 
