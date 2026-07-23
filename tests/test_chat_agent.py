@@ -60,3 +60,7 @@ async def test_chat_agent_executes_tool_calls_and_returns_final_answer() -> None
         "name": "query_internal_docs",
         "content": "runbook result",
     }
+    records = agent.tool_call_records("s1")
+    assert len(records) == 1
+    assert records[0].name == "query_internal_docs"
+    assert records[0].status == "succeeded"

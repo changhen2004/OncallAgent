@@ -76,8 +76,15 @@ class ToolCallRecord:
     output: str
     status: ToolCallStatus
     error: str = ""
+    error_type: str = ""
     started_at: datetime | None = None
     ended_at: datetime | None = None
+
+    @property
+    def duration_ms(self) -> int:
+        if self.started_at is None or self.ended_at is None:
+            return 0
+        return max(0, int((self.ended_at - self.started_at).total_seconds() * 1000))
 
 
 @dataclass

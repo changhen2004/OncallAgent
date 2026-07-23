@@ -5,7 +5,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Protocol
 
+from oncallagent.harness import ToolCallRecord
 from oncallagent.llm import ChatMessage
+from oncallagent.tool_runtime import ToolExecutor
 
 
 class Tool(Protocol):
@@ -51,11 +53,20 @@ class ChatMemory:
 
 
 class ChatAgent:
-    def __init__(self, model: ToolCallingModel, tools: list[Tool], *, max_iterations: int = 8) -> None:
+    def __init__(
+        self,
+        model: ToolCallingModel,
+        tools: list[Tool],
+        *,
+        max_iterations: int = 8,
+        tool_timeout_seconds: float = 10.0,
+    ) -> None:
         self.model = model
         self.tools = {tool.name: tool for tool in tools}
+        self.tool_executor = ToolExecutor(tools, timeout_seconds=tool_timeout_seconds)
         self.max_iterations = max_iterations
         self._memories: dict[str, ChatMemory] = defaultdict(ChatMemory)
+        self._tool_records: dict[str, list[ToolCallRecord]] = defaultdict(list)
 
     async def chat(self, question: str, session_id: str) -> str:
         memory = self._memories[session_id]
@@ -98,7 +109,7 @@ class ChatAgent:
                 }
             )
             for call in tool_calls:
-                result = await self._call_tool(call)
+                result = await self._call_tool(call, session_id)
                 messages.append(
                     {
                         "role": "tool",
@@ -112,12 +123,13 @@ class ChatAgent:
         memory.append(ChatMessage(role="assistant", content=answer))
         return answer
 
-    async def _call_tool(self, call: ToolCall) -> ToolResult:
-        tool = self.tools.get(call.name)
-        if tool is None:
-            return ToolResult(call.id, call.name, f"tool {call.name} is not configured")
-        output = await tool.call(call.arguments)
-        return ToolResult(call.id, call.name, output)
+    def tool_call_records(self, session_id: str) -> list[ToolCallRecord]:
+        return list(self._tool_records[session_id])
+
+    async def _call_tool(self, call: ToolCall, session_id: str) -> ToolResult:
+        execution = await self.tool_executor.execute(call.id, call.name, call.arguments)
+        self._tool_records[session_id].append(execution.record)
+        return ToolResult(call.id, call.name, execution.content)
 
     @staticmethod
     def _message_to_dict(message: ChatMessage) -> dict:

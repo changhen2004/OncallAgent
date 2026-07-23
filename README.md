@@ -353,6 +353,7 @@ OnCallAgent/
 │   ├── llm.py                  # OpenAI 兼容 Chat Completions 客户端
 │   ├── mcp.py                  # MCP/SSE 工具发现客户端
 │   ├── tools.py                # 内置 Agent 工具
+│   ├── tool_runtime.py         # 工具执行、超时和调用记录
 │   ├── factory.py              # 可选依赖装配
 │   ├── harness.py              # SDD 验证辅助
 │   └── plan.py                 # Prometheus 告警计划分析
