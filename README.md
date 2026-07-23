@@ -388,6 +388,7 @@ OnCallAgent/
 - Markdown 文档命中
 - SSE 流式输出
 - 时间、知识库和 Prometheus 工具调用
+- Harness Run 状态记录，包括停止原因、迭代次数和工具调用记录
 
 ### 2. PlanService / PlanExecuteReplanAgent (运维计划服务)
 

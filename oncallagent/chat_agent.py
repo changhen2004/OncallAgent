@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Protocol
 
-from oncallagent.harness import ToolCallRecord
+from oncallagent.harness import AgentState, RunBudget, StopReason, ToolCallRecord
 from oncallagent.llm import ChatMessage
 from oncallagent.tool_runtime import ToolExecutor
 
@@ -36,6 +36,12 @@ class ToolResult:
     tool_call_id: str
     name: str
     content: str
+
+
+@dataclass(frozen=True)
+class ChatAgentRunResult:
+    answer: str
+    state: AgentState
 
 
 class ChatMemory:
@@ -69,6 +75,14 @@ class ChatAgent:
         self._tool_records: dict[str, list[ToolCallRecord]] = defaultdict(list)
 
     async def chat(self, question: str, session_id: str) -> str:
+        result = await self.run(question, session_id=session_id)
+        return result.answer
+
+    async def run(
+        self, question: str, session_id: str, incident_id: str | None = None
+    ) -> ChatAgentRunResult:
+        state = AgentState.new(incident_id or session_id, question)
+        budget = RunBudget(max_iterations=self.max_iterations)
         memory = self._memories[session_id]
         messages = [self._message_to_dict(message) for message in memory.history()]
         messages.append({"role": "user", "content": question})
@@ -83,13 +97,20 @@ class ChatAgent:
 
         answer = ""
         for _ in range(self.max_iterations):
+            reason, allowed = budget.check(state.usage)
+            if not allowed:
+                state.stop(reason)
+                return ChatAgentRunResult(answer=answer, state=state)
+
+            state.usage.iterations += 1
             response = await self.model.chat_with_tools(messages, tool_specs)
             answer = response.get("content", "")
             tool_calls = [self._normalize_tool_call(call) for call in response.get("tool_calls", [])]
             if not tool_calls:
                 memory.append(ChatMessage(role="user", content=question))
                 memory.append(ChatMessage(role="assistant", content=answer))
-                return answer
+                state.stop(StopReason.COMPLETED)
+                return ChatAgentRunResult(answer=answer, state=state)
 
             messages.append(
                 {
@@ -109,7 +130,7 @@ class ChatAgent:
                 }
             )
             for call in tool_calls:
-                result = await self._call_tool(call, session_id)
+                result = await self._call_tool(call, session_id, state)
                 messages.append(
                     {
                         "role": "tool",
@@ -121,14 +142,16 @@ class ChatAgent:
 
         memory.append(ChatMessage(role="user", content=question))
         memory.append(ChatMessage(role="assistant", content=answer))
-        return answer
+        state.stop(StopReason.BUDGET_EXCEEDED)
+        return ChatAgentRunResult(answer=answer, state=state)
 
     def tool_call_records(self, session_id: str) -> list[ToolCallRecord]:
         return list(self._tool_records[session_id])
 
-    async def _call_tool(self, call: ToolCall, session_id: str) -> ToolResult:
+    async def _call_tool(self, call: ToolCall, session_id: str, state: AgentState) -> ToolResult:
         execution = await self.tool_executor.execute(call.id, call.name, call.arguments)
         self._tool_records[session_id].append(execution.record)
+        state.record_tool_call(execution.record)
         return ToolResult(call.id, call.name, execution.content)
 
     @staticmethod

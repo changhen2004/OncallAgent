@@ -12,6 +12,7 @@
 - 错误分类：`not_configured`、`invalid_input`、`timeout`、`exception`
 - 兜底策略：工具失败不抛出到 Agent 主流程，而是返回结构化失败 JSON 作为 tool message
 - ChatAgent 接入：`ChatAgent.tool_call_records(session_id)` 可查看指定会话的工具调用记录
+- Harness 接入：`ChatAgent.run()` 会将真实工具调用写入 `AgentState.tool_calls`
 
 ## 验证命令
 
@@ -21,7 +22,7 @@
 
 ## 后续改造方向
 
-- 将工具调用记录接入 `AgentState`，形成完整 Agent Run 证据链。
+- 将 `PlanExecuteReplanAgent` 子步骤的 ChatAgent Run 状态合并到总状态。
 - 为 Prometheus、RAG、MCP 工具补充更细粒度的输入 schema。
 - 在 `/chat` 或调试接口中按需暴露工具调用摘要，便于演示和排障。
 - 对工具调用失败率、平均耗时和超时次数增加 Prometheus 指标。
