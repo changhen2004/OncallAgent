@@ -32,6 +32,9 @@ class PlanService:
                 ],
             )
 
+        return self.plan_from_payload(payload)
+
+    def plan_from_payload(self, payload: dict) -> PlanReport:
         active_alerts = [
             alert for alert in simplify_prometheus_alerts(payload) if alert.state == "firing"
         ]

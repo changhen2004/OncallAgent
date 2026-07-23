@@ -40,6 +40,12 @@ Run RAG evaluation:
 /home/chg/.local/bin/uv run python scripts/rag_eval.py --format markdown
 ```
 
+Run the offline incident demo flow:
+
+```bash
+/home/chg/.local/bin/uv run python scripts/demo_incident_flow.py
+```
+
 Run the FastAPI service:
 
 ```bash

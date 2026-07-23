@@ -371,6 +371,7 @@ OnCallAgent/
 │   └── rag_questions.json      # RAG 评估问题集
 ├── scripts/
 │   ├── rag_eval.py             # RAG TopK 命中率评估脚本
+│   ├── demo_incident_flow.py   # Prometheus -> Runbook -> Agent 演示脚本
 │   └── cls-mcp.sh              # CLS MCP 启动脚本
 ├── prometheus_config/          # Prometheus 配置
 ├── prometheusTestServer/       # 测试服务器
@@ -421,6 +422,7 @@ OnCallAgent/
 /home/chg/.local/bin/uv run pytest
 docker compose -f docker-compose.prometheus.yml config
 /home/chg/.local/bin/uv run python scripts/rag_eval.py --format markdown
+/home/chg/.local/bin/uv run python scripts/demo_incident_flow.py
 curl http://localhost:9090/api/v1/alerts
 curl http://localhost:8819/ping
 curl http://localhost:8819/plan
