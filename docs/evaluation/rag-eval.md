@@ -19,11 +19,31 @@
 /home/chg/.local/bin/uv run python scripts/rag_eval.py --format markdown
 ```
 
-最新结果：
+优化前结果：
 
 ```text
 Total questions: 30
 Top1 hits: 28/30 (93.33%)
+Top3 hits: 30/30 (100.00%)
+```
+
+失败样本分析：
+
+- `p95-008`：问题包含“慢请求日志、latency_ms、level=WARN”，但旧检索将中文拆成单字，“日志、level、resource_community_go”等泛化 token 让 5xx 手册排到第一。
+- `backlog-002`：问题包含“点赞、浏览、评论、收藏、热度或积分更新延迟、消息队列积压”，热榜手册和 RabbitMQ 积压手册共享大量业务词，旧检索缺少文件名、标题和短语级权重，导致热榜手册排到第一。
+
+优化策略：
+
+- 中文检索从单字 token 调整为连续中文片段的 bigram/trigram，降低“应该参考哪个”等泛化单字噪声。
+- 保留唯一 token 交集作为基础分，避免正文重复词过度放大。
+- 对文件名和 Markdown 标题命中的 token 加权，强化 runbook 主题识别。
+- 对日志原文和指标类英文短语做连续短语匹配加分，例如 `idempotency begin failed`、`worker delivery channel closed`。
+
+优化后结果：
+
+```text
+Total questions: 30
+Top1 hits: 30/30 (100.00%)
 Top3 hits: 30/30 (100.00%)
 ```
 

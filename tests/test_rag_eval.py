@@ -89,3 +89,13 @@ def test_rag_eval_script_runs_from_repo_root() -> None:
     report = json.loads(result.stdout)
     assert report["total"] >= 30
     assert report["top3_hits"] == report["total"]
+
+
+def test_default_rag_eval_reaches_full_top1_after_failure_sample_optimization() -> None:
+    from oncallagent.rag_eval import evaluate_default_runbooks
+
+    report = evaluate_default_runbooks()
+    non_top1_cases = [case.id for case in report.cases if case.hit_rank != 1]
+
+    assert report.top1_hits == report.total
+    assert non_top1_cases == []

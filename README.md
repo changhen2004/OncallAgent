@@ -405,6 +405,7 @@ OnCallAgent/
 - 文档上传后保存到 `docs/runbooks/`
 - 启动时自动加载已有 Markdown
 - 开启 `enable_external_indexing` 后，可通过 Ollama Embedding 将分块写入 Qdrant
+- 当前 RAG Eval 覆盖 30 条告警问题，Top1 命中率 100%，Top3 命中率 100%
 
 ### 4. Tools / Integrations (工具和外部集成)
 

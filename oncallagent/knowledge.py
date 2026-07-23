@@ -8,7 +8,7 @@ from typing import Protocol
 from fastapi import UploadFile
 
 
-_TOKEN_RE = re.compile(r"[A-Za-z0-9_.-]+|[\u4e00-\u9fff]")
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_.-]+|[\u4e00-\u9fff]+")
 
 
 @dataclass(frozen=True)
@@ -50,18 +50,20 @@ class KnowledgeIndex:
         return "上传成功"
 
     def search(self, query: str, limit: int = 3) -> list[SearchResult]:
-        query_tokens = set(_tokenize(query))
+        query_tokens = _tokenize(query)
         if not query_tokens:
             return []
 
         results: list[SearchResult] = []
         for filename, content in self._documents.items():
             doc_tokens = set(_tokenize(filename)) | set(_tokenize(content))
-            score = len(query_tokens & doc_tokens)
+            score = len(set(query_tokens) & doc_tokens)
+            score += _metadata_match_bonus(query_tokens, filename, content)
+            score += _phrase_match_bonus(query, content)
             if score > 0:
                 results.append(SearchResult(filename=filename, content=content, score=score))
 
-        return sorted(results, key=lambda item: item.score, reverse=True)[:limit]
+        return sorted(results, key=lambda item: (-item.score, item.filename))[:limit]
 
     @staticmethod
     def _safe_filename(filename: str) -> str:
@@ -70,4 +72,51 @@ class KnowledgeIndex:
 
 
 def _tokenize(text: str) -> list[str]:
-    return [match.group(0).lower() for match in _TOKEN_RE.finditer(text)]
+    tokens: list[str] = []
+    for match in _TOKEN_RE.finditer(text):
+        token = match.group(0).lower()
+        if re.fullmatch(r"[\u4e00-\u9fff]+", token):
+            tokens.extend(_chinese_ngrams(token))
+        else:
+            tokens.append(token)
+    return tokens
+
+
+def _chinese_ngrams(text: str) -> list[str]:
+    if len(text) <= 1:
+        return [text]
+    grams: list[str] = []
+    for size in (2, 3):
+        if len(text) >= size:
+            grams.extend(text[index : index + size] for index in range(len(text) - size + 1))
+    return grams
+
+
+def _metadata_match_bonus(query_tokens: list[str], filename: str, content: str) -> int:
+    query_set = set(query_tokens)
+    metadata_tokens = set(_tokenize(filename))
+    for heading in re.findall(r"(?m)^#{1,3}\s+(.+)$", content):
+        metadata_tokens.update(_tokenize(heading))
+    return len(query_set & metadata_tokens) * 3
+
+
+def _phrase_match_bonus(query: str, content: str) -> int:
+    query_words = re.findall(r"[A-Za-z0-9_.-]+", query.lower())
+    if len(query_words) < 3:
+        return 0
+    normalized_content = _normalize_phrase_text(content)
+    bonus = 0
+    seen_phrases: set[str] = set()
+    for size in range(3, min(5, len(query_words)) + 1):
+        for index in range(len(query_words) - size + 1):
+            phrase = " ".join(query_words[index : index + size])
+            if phrase in seen_phrases:
+                continue
+            seen_phrases.add(phrase)
+            if phrase in normalized_content:
+                bonus += size * 2
+    return bonus
+
+
+def _normalize_phrase_text(text: str) -> str:
+    return " ".join(re.findall(r"[A-Za-z0-9_.-]+", text.lower()))
