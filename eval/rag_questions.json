@@ -1,0 +1,152 @@
+[
+  {
+    "id": "p95-001",
+    "question": "ResourceCommunityHighP95Latency 告警触发，整体 P95 延迟超过 500ms 应该查看哪份手册？",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-002",
+    "question": "resource_community_go 后端接口 P95 latency 升高，指标 resource_community_http_request_duration_seconds_bucket 异常",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-003",
+    "question": "Grafana 的 P95 Latency By Route 面板显示 /api/articles 很慢，怀疑 Redis 缓存不可用",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-004",
+    "question": "所有接口同时变慢，需要检查 MySQL Redis RabbitMQ 容器健康状态和 CPU 内存",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-005",
+    "question": "histogram_quantile 0.95 看到后端 1 分钟内延迟升高，怎么判断单个路由还是全站慢？",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-006",
+    "question": "文章详情 /api/articles/:id 响应慢，可能是详情缓存未命中或 MySQL 查询变慢",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-007",
+    "question": "本地 Docker 资源不足导致接口慢，请给出 P95 延迟过高排障流程",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "p95-008",
+    "question": "慢请求日志出现 latency_ms 和 level=WARN，应该参考哪个 resource_community_go runbook？",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "error-001",
+    "question": "ResourceCommunityHighErrorRate 告警触发，1 分钟内 5xx 错误率超过 5%",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-002",
+    "question": "resource_community_http_requests_total 中 status=5xx 持续升高，需要定位哪个路由产生 500",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-003",
+    "question": "QPS By Status 面板显示 5xx，后端日志有 level=ERROR status=500 errors 字段",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-004",
+    "question": "登录、注册、资源发布、积分解锁等写接口返回 500，怀疑 MySQL 连接或迁移问题",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-005",
+    "question": "点赞评论收藏等互动接口出现 5xx，应该检查 Redis 和 RabbitMQ 是否可用",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-006",
+    "question": "/metrics 和 /healthz 正常但业务接口 5xx，应该继续定位依赖还是重启服务？",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-007",
+    "question": "请求参数错误被映射成 500，需要补充参数校验和错误码映射",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "error-008",
+    "question": "恢复后如何验证 5xx QPS 回到 0，并观察整体错误率至少 2 分钟？",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "hot-001",
+    "question": "/api/articles/hot 返回 200 但热榜排序长期不变化",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-002",
+    "question": "用户浏览、点赞、评论、收藏后热榜分数没有明显变化，热榜 Redis ZSet 可能异常",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-003",
+    "question": "RabbitMQ 异步任务已经发布但 Worker 尚未更新热度，导致热榜不更新",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-004",
+    "question": "Worker 日志出现 process async job failed、idempotency begin failed、worker delivery channel closed",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-005",
+    "question": "触发一次点赞或收藏后热榜仍不变化，重点检查 Worker 是否运行",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-006",
+    "question": "文章列表或热榜缓存没有及时失效，前端看到旧的热门资源排序",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "hot-007",
+    "question": "恢复 Redis 后重新触发浏览点赞收藏事件，验证 /api/articles/hot 排序变化",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "backlog-001",
+    "question": "RabbitMQ 管理台显示 resource_community_go.async.jobs 队列 ready 消息持续增加",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-002",
+    "question": "点赞、浏览、评论、收藏后热度或积分更新延迟，怀疑消息队列积压",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-003",
+    "question": "Worker 从 RabbitMQ 消费失败，反复 Nack 并重新入队",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-004",
+    "question": "RabbitMQ 队列 unacked 长时间不下降，说明 Worker 已取到消息但处理卡住",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-005",
+    "question": "Worker 日志持续出现 process async job failed 和 idempotency complete failed",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-006",
+    "question": "Redis 异常导致幂等记录无法创建，MySQL 异常导致异步任务处理失败",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "backlog-007",
+    "question": "本地压测流量过大，单个 Worker 消费速度不足，队列积压恢复演练怎么做？",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  }
+]

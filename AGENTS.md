@@ -34,6 +34,12 @@ Run the test suite:
 /home/chg/.local/bin/uv run pytest
 ```
 
+Run RAG evaluation:
+
+```bash
+/home/chg/.local/bin/uv run python scripts/rag_eval.py --format markdown
+```
+
 Run the FastAPI service:
 
 ```bash

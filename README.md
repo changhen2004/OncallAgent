@@ -364,7 +364,13 @@ OnCallAgent/
 │   └── config_template.json    # 配置模板
 ├── docs/
 │   ├── runbooks/               # 运维知识库文档
+│   ├── evaluation/             # RAG Eval 和项目证据记录
 │   └── development/            # 开发流程和工程规范文档
+├── eval/
+│   └── rag_questions.json      # RAG 评估问题集
+├── scripts/
+│   ├── rag_eval.py             # RAG TopK 命中率评估脚本
+│   └── cls-mcp.sh              # CLS MCP 启动脚本
 ├── prometheus_config/          # Prometheus 配置
 ├── prometheusTestServer/       # 测试服务器
 ├── docker-compose.prometheus.yml
@@ -412,6 +418,7 @@ OnCallAgent/
 ```bash
 /home/chg/.local/bin/uv run pytest
 docker compose -f docker-compose.prometheus.yml config
+/home/chg/.local/bin/uv run python scripts/rag_eval.py --format markdown
 curl http://localhost:9090/api/v1/alerts
 curl http://localhost:8819/ping
 curl http://localhost:8819/plan
