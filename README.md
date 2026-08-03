@@ -30,8 +30,9 @@ OnCallAgent 是一个面向运维场景的智能代理系统，主要解决“�
 - **告警分析** - 自动获取 Prometheus 活跃告警，匹配内部处理方案
 - **RAG 检索** - 默认基于本地 Markdown 关键词检索；开启外部索引后可接入 Ollama Embedding + Qdrant 向量库
 - **工具扩展** - 内置时间、知识库检索、Prometheus 告警工具，并保留 MCP/SSE 日志工具发现能力
-- **降级可用** - Prometheus 不可用时仍返回可执行检查建议，便于本地开发和测试
-- **实践联动** - 可接入 resource_community_go 的 Prometheus 告警和排障文档，形成“业务系统指标 - 告警 - 知识库 - 分析建议”的闭环
+- **会话持久化** - 可选 PostgreSQL 持久化，重启后自动恢复对话历史和工具调用审计记录
+- **降级可用** - Prometheus、PostgreSQL 等外部依赖不可用时仍可正常运行，便于本地开发和测试
+- **实践联动** - 可接入 resource_community_go 的 Prometheus 告警和排障文档，形成”业务系统指标 - 告警 - 知识库 - 分析建议”的闭环
 
 ## 技术架构
 
@@ -65,6 +66,7 @@ OnCallAgent 是一个面向运维场景的智能代理系统，主要解决“�
 ├─────────────────────────────────────────────────────────────┤
 │  Storage                                                    │
 │  └── docs/runbooks/       - Markdown 知识库文档               │
+│  └── PostgreSQL (可选)     - 会话历史、工具调用、Agent Run 审计  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -77,6 +79,7 @@ OnCallAgent 是一个面向运维场景的智能代理系统，主要解决“�
 - Prometheus (可选，用于告警分析；本仓库 Compose 默认 `http://localhost:9090`，接入 resource_community_go 时通常使用 `http://localhost:9091`)
 - OpenAI 兼容 API Key (可选；未配置时使用本地知识库降级回复)
 - Ollama + Qdrant (可选；仅开启外部索引时需要)
+- PostgreSQL (可选；用于会话历史和审计记录持久化)
 - MCP/SSE 服务 (可选；用于接入外部日志或云日志工具)
 
 ### 安装步骤
@@ -152,6 +155,11 @@ docker compose -f docker-compose.prometheus.yml up -d
   "cls_mcp": {
     "base_url": "http://localhost:3100/sse",
     "enabled": true
+  },
+  "storage": {
+    "database_url": "",
+    "min_connections": 2,
+    "max_connections": 10
   }
 }
 ```
@@ -164,6 +172,9 @@ docker compose -f docker-compose.prometheus.yml up -d
 | `openai.*` | OpenAI 兼容 API 配置；配置 `api_key` 后启用 ChatAgent 工具调用 |
 | `prometheus.url` | Prometheus 服务地址 |
 | `cls_mcp.*` | MCP/SSE 外部工具地址和启用开关 |
+| `storage.database_url` | PostgreSQL 连接串（如 `postgresql://user:pass@localhost:5432/oncallagent`）；留空则不启用持久化，所有数据仅存内存 |
+| `storage.min_connections` | 连接池最小连接数，默认 2 |
+| `storage.max_connections` | 连接池最大连接数，默认 10 |
 
 如果接入 `resource_community_go` 的可观测性平台，Prometheus 地址应改为：
 
@@ -355,7 +366,9 @@ OnCallAgent/
 │   ├── tools.py                # 内置 Agent 工具
 │   ├── tool_runtime.py         # 工具执行、超时和调用记录
 │   ├── factory.py              # 可选依赖装配
-│   ├── harness.py              # SDD 验证辅助
+│   ├── harness.py              # Agent 状态、预算和证据记录
+│   ├── storage.py              # 会话持久化（Protocol + PostgreSQL 实现）
+│   ├── migrations.py           # 数据库 schema 迁移管理
 │   └── plan.py                 # Prometheus 告警计划分析
 ├── tests/
 │   ├── test_api.py             # API 行为测试
@@ -407,7 +420,20 @@ OnCallAgent/
 - 开启 `enable_external_indexing` 后，可通过 Ollama Embedding 将分块写入 Qdrant
 - 当前 RAG Eval 覆盖 30 条告警问题，Top1 命中率 100%，Top3 命中率 100%
 
-### 4. Tools / Integrations (工具和外部集成)
+### 4. ConversationStore / PostgresStore (会话持久化)
+
+可选的 PostgreSQL 持久化层，遵循项目 Protocol 注入模式。启用后在服务重启后自动恢复：
+
+- **会话消息**：每次 `ChatAgent.run()` 从 DB 加载最近 N 条消息恢复 `ChatMemory` 滑动窗口，新消息实时写入
+- **工具调用审计**：每次工具调用同步写入 `tool_call_records` 表，记录输入、输出、状态和耗时
+- **Agent Run 状态**：每次 Plan/Replan 执行完成后持久化 `AgentState`（目标、停止原因、迭代次数等）
+- **证据和降级记录**：`Evidence` 和 `ChatService` fallback Q&A 同步持久化
+
+不配置 `storage.database_url`（默认空字符串）时，行为完全回退到纯内存模式。
+
+数据库 Schema 由 `migrations.py` 自动管理：启动时检查 `schema_migrations` 表，按版本号顺序执行未应用的迁移。
+
+### 5. Tools / Integrations (工具和外部集成)
 
 内置工具和外部集成包括：
 - `TimeTool`：获取当前时间
@@ -459,6 +485,7 @@ curl http://localhost:8819/plan
 - **依赖管理**: [uv](https://docs.astral.sh/uv/)
 - **知识库**: Markdown 本地索引，可选 Ollama Embedding + Qdrant 向量索引
 - **LLM**: OpenAI 兼容 Chat Completions API
+- **持久化**: 可选 [PostgreSQL](https://www.postgresql.org/) + [asyncpg](https://github.com/MagicStack/asyncpg)
 - **监控**: [Prometheus](https://prometheus.io/)
 - **外部工具**: MCP/SSE
 
