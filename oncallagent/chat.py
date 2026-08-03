@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Protocol
 
 from oncallagent.knowledge import KnowledgeIndex
+from oncallagent.storage import ConversationStore
 
 
 class AgentChat(Protocol):
@@ -13,9 +14,15 @@ class AgentChat(Protocol):
 
 
 class ChatService:
-    def __init__(self, knowledge: KnowledgeIndex, agent: AgentChat | None = None) -> None:
+    def __init__(
+        self,
+        knowledge: KnowledgeIndex,
+        agent: AgentChat | None = None,
+        storage: ConversationStore | None = None,
+    ) -> None:
         self.knowledge = knowledge
         self.agent = agent
+        self.storage = storage
         self._memory: dict[str, list[tuple[str, str]]] = defaultdict(list)
 
     async def chat(self, question: str, session_id: str) -> str:
@@ -33,6 +40,8 @@ class ChatService:
             )
 
         self._memory[session_id].append((question, answer))
+        if self.storage is not None:
+            await self.storage.save_chat_history(session_id, question, answer)
         return answer
 
     async def stream_chat(self, question: str, session_id: str) -> AsyncIterator[str]:

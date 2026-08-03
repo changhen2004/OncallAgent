@@ -8,6 +8,7 @@ from typing import Protocol
 
 from oncallagent.harness import AgentState, RunBudget, StopReason
 from oncallagent.llm import ChatMessage
+from oncallagent.storage import ConversationStore
 
 
 @dataclass(frozen=True)
@@ -124,10 +125,12 @@ class PlanExecuteReplanAgent:
         replanner: Replanner,
         *,
         max_iterations: int = 20,
+        storage: ConversationStore | None = None,
     ) -> None:
         self.planner = planner
         self.executor = executor
         self.replanner = replanner
+        self.storage = storage
         self.budget = RunBudget(max_iterations=max_iterations)
 
     async def run(self, query: str, incident_id: str = "plan") -> AgentRunResult:
@@ -140,6 +143,7 @@ class PlanExecuteReplanAgent:
             reason, allowed = self.budget.check(state.usage)
             if not allowed:
                 state.stop(reason)
+                await self._persist_plan_run(state, details, last_message)
                 return AgentRunResult(last_message=last_message, details=details, state=state)
 
             step = remaining.pop(0)
@@ -153,11 +157,25 @@ class PlanExecuteReplanAgent:
                 details.append(decision.final_answer)
                 last_message = decision.final_answer
                 state.stop(StopReason.COMPLETED)
+                await self._persist_plan_run(state, details, last_message)
                 return AgentRunResult(last_message=last_message, details=details, state=state)
             remaining = decision.remaining_steps
 
         state.stop(StopReason.COMPLETED)
+        await self._persist_plan_run(state, details, last_message)
         return AgentRunResult(last_message=last_message, details=details, state=state)
+
+    async def _persist_plan_run(
+        self,
+        state: AgentState,
+        details: list[str],
+        last_message: str,
+    ) -> None:
+        if self.storage is None:
+            return
+        for evidence in state.evidence:
+            await self.storage.save_evidence(evidence)
+        await self.storage.save_agent_run(state)
 
     def run_sync(self, query: str, incident_id: str = "plan") -> AgentRunResult:
         return asyncio.run(self.run(query, incident_id=incident_id))
