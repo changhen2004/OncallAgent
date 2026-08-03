@@ -7,6 +7,7 @@ from typing import Protocol
 
 from oncallagent.harness import AgentState, RunBudget, StopReason, ToolCallRecord
 from oncallagent.llm import ChatMessage
+from oncallagent.storage import ConversationStore
 from oncallagent.tool_runtime import ToolExecutor
 
 
@@ -66,13 +67,17 @@ class ChatAgent:
         *,
         max_iterations: int = 8,
         tool_timeout_seconds: float = 10.0,
+        storage: ConversationStore | None = None,
     ) -> None:
         self.model = model
         self.tools = {tool.name: tool for tool in tools}
         self.tool_executor = ToolExecutor(tools, timeout_seconds=tool_timeout_seconds)
         self.max_iterations = max_iterations
+        self.storage = storage
         self._memories: dict[str, ChatMemory] = defaultdict(ChatMemory)
         self._tool_records: dict[str, list[ToolCallRecord]] = defaultdict(list)
+        self._loaded_sessions: set[str] = set()
+        self._message_seq: dict[str, int] = {}
 
     async def chat(self, question: str, session_id: str) -> str:
         result = await self.run(question, session_id=session_id)
@@ -83,6 +88,11 @@ class ChatAgent:
     ) -> ChatAgentRunResult:
         state = AgentState.new(incident_id or session_id, question)
         budget = RunBudget(max_iterations=self.max_iterations)
+
+        if self.storage is not None and session_id not in self._loaded_sessions:
+            await self._load_session_from_storage(session_id)
+            self._loaded_sessions.add(session_id)
+
         memory = self._memories[session_id]
         messages = [self._message_to_dict(message) for message in memory.history()]
         messages.append({"role": "user", "content": question})
@@ -100,6 +110,7 @@ class ChatAgent:
             reason, allowed = budget.check(state.usage)
             if not allowed:
                 state.stop(reason)
+                await self._persist_run(session_id, question, answer, state)
                 return ChatAgentRunResult(answer=answer, state=state)
 
             state.usage.iterations += 1
@@ -110,6 +121,7 @@ class ChatAgent:
                 memory.append(ChatMessage(role="user", content=question))
                 memory.append(ChatMessage(role="assistant", content=answer))
                 state.stop(StopReason.COMPLETED)
+                await self._persist_run(session_id, question, answer, state)
                 return ChatAgentRunResult(answer=answer, state=state)
 
             messages.append(
@@ -143,6 +155,7 @@ class ChatAgent:
         memory.append(ChatMessage(role="user", content=question))
         memory.append(ChatMessage(role="assistant", content=answer))
         state.stop(StopReason.BUDGET_EXCEEDED)
+        await self._persist_run(session_id, question, answer, state)
         return ChatAgentRunResult(answer=answer, state=state)
 
     def tool_call_records(self, session_id: str) -> list[ToolCallRecord]:
@@ -152,7 +165,52 @@ class ChatAgent:
         execution = await self.tool_executor.execute(call.id, call.name, call.arguments)
         self._tool_records[session_id].append(execution.record)
         state.record_tool_call(execution.record)
+        if self.storage is not None:
+            await self._ensure_session(session_id)
+            await self.storage.save_tool_record(session_id, execution.record)
         return ToolResult(call.id, call.name, execution.content)
+
+    # ------------------------------------------------------------ storage helpers
+
+    async def _ensure_session(self, session_id: str) -> None:
+        if self.storage is not None:
+            await self.storage.ensure_session(session_id)
+
+    async def _load_session_from_storage(self, session_id: str) -> None:
+        if self.storage is None:
+            return
+        rows = await self.storage.load_recent_messages(session_id, limit=6)
+        memory = self._memories[session_id]
+        existing = {(msg.role, msg.content) for msg in memory.history()}
+        max_seq = 0
+        for row in rows:
+            max_seq = max(max_seq, row["seq"])
+            if (row["role"], row["content"]) not in existing:
+                memory.append(ChatMessage(role=row["role"], content=row["content"]))
+                existing.add((row["role"], row["content"]))
+        self._message_seq[session_id] = max_seq
+
+    async def _persist_message(self, session_id: str, role: str, content: str) -> None:
+        if self.storage is None:
+            return
+        seq = self._message_seq.get(session_id, 0) + 1
+        self._message_seq[session_id] = seq
+        await self._ensure_session(session_id)
+        await self.storage.save_message(session_id, seq, role, content)
+
+    async def _persist_run(
+        self,
+        session_id: str,
+        question: str,
+        answer: str,
+        state: AgentState,
+    ) -> None:
+        if self.storage is None:
+            return
+        await self._persist_message(session_id, "user", question)
+        if answer:
+            await self._persist_message(session_id, "assistant", answer)
+        await self.storage.save_agent_run(state)
 
     @staticmethod
     def _message_to_dict(message: ChatMessage) -> dict:
