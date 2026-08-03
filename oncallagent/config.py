@@ -39,6 +39,12 @@ class CLSMcpConfig(BaseModel):
     enabled: bool = True
 
 
+class StorageConfig(BaseModel):
+    database_url: str = ""
+    min_connections: int = 2
+    max_connections: int = 10
+
+
 class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     embedder: EmbedderConfig = Field(default_factory=EmbedderConfig)
@@ -46,6 +52,7 @@ class AppConfig(BaseModel):
     prometheus: PrometheusConfig = Field(default_factory=PrometheusConfig)
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     cls_mcp: CLSMcpConfig = Field(default_factory=CLSMcpConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
 
     def get_server_addr(self) -> str:
         return f"{self.server.host}:{self.server.port}"

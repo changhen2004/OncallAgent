@@ -5,6 +5,7 @@ description = "FastAPI refactor of OnCallAgent"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "asyncpg>=0.30.0",
     "fastapi>=0.116.1",
     "httpx>=0.27.0",
     "prometheus-client>=0.25.0",
