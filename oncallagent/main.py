@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Request, UploadFile
@@ -11,7 +12,11 @@ from pydantic import BaseModel, Field
 
 from oncallagent.chat import ChatService
 from oncallagent.config import load_config
-from oncallagent.factory import build_optional_chat_agent, build_optional_external_indexer
+from oncallagent.factory import (
+    build_optional_chat_agent,
+    build_optional_external_indexer,
+    build_optional_lazy_store,
+)
 from oncallagent.knowledge import KnowledgeIndex
 from oncallagent.plan import PlanService
 
@@ -33,11 +38,21 @@ def create_app(
         config, enabled=enable_external_indexing
     )
     knowledge = KnowledgeIndex(docs_dir, external_indexer=external_indexer)
-    chat_agent = build_optional_chat_agent(config, knowledge)
-    chat_service = ChatService(knowledge, agent=chat_agent)
+
+    # Lazily-initialised PostgreSQL store (None → in-memory-only fallback).
+    lazy_store = build_optional_lazy_store(config)
+    chat_agent = build_optional_chat_agent(config, knowledge, storage=lazy_store)
+    chat_service = ChatService(knowledge, agent=chat_agent, storage=lazy_store)
     plan_service = PlanService(prometheus_url or config.prometheus.url, knowledge)
 
-    app = FastAPI(title="OnCallAgent", version="0.1.0")
+    # Lifespan: only used to close the pool on shutdown.
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        yield
+        if lazy_store is not None:
+            await lazy_store.close()
+
+    app = FastAPI(title="OnCallAgent", version="0.1.0", lifespan=_lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

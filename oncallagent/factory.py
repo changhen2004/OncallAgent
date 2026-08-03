@@ -9,6 +9,7 @@ from oncallagent.knowledge import KnowledgeIndex
 from oncallagent.llm import OpenAICompatibleChatModel
 from oncallagent.mcp import HttpJsonRpcTransport, MCPClient, MCPTool
 from oncallagent.qdrant import QdrantVectorStore
+from oncallagent.storage import ConversationStore, LazyPostgresStore
 from oncallagent.tools import KnowledgeSearchTool, PrometheusAlertsTool, TimeTool
 
 
@@ -22,7 +23,21 @@ def build_chat_model(cfg: AppConfig) -> OpenAICompatibleChatModel | None:
     )
 
 
-def build_optional_chat_agent(cfg: AppConfig, knowledge: KnowledgeIndex) -> ChatAgent | None:
+def build_optional_lazy_store(cfg: AppConfig) -> LazyPostgresStore | None:
+    """Create a lazily-initialised PostgreSQL store.  Returns None when no
+    database_url is configured, preserving the existing in-memory-only mode."""
+    if not cfg.storage.database_url:
+        return None
+    return LazyPostgresStore(
+        cfg.storage.database_url,
+        min_size=cfg.storage.min_connections,
+        max_size=cfg.storage.max_connections,
+    )
+
+
+def build_optional_chat_agent(
+    cfg: AppConfig, knowledge: KnowledgeIndex, *, storage: ConversationStore | None = None
+) -> ChatAgent | None:
     model = build_chat_model(cfg)
     if model is None:
         return None
@@ -31,11 +46,14 @@ def build_optional_chat_agent(cfg: AppConfig, knowledge: KnowledgeIndex) -> Chat
         KnowledgeSearchTool(knowledge),
         PrometheusAlertsTool(cfg.get_prometheus_url()),
     ]
-    return ChatAgent(model=model, tools=tools)
+    return ChatAgent(model=model, tools=tools, storage=storage)
 
 
 def build_optional_plan_agent(
-    cfg: AppConfig, chat_agent: ChatAgent | None
+    cfg: AppConfig,
+    chat_agent: ChatAgent | None,
+    *,
+    storage: ConversationStore | None = None,
 ) -> PlanExecuteReplanAgent | None:
     model = build_chat_model(cfg)
     if model is None or chat_agent is None:
@@ -45,6 +63,7 @@ def build_optional_plan_agent(
         executor=LLMExecutor(chat_agent),
         replanner=LLMReplanner(model),
         max_iterations=20,
+        storage=storage,
     )
 
 
