@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from oncallagent.agent import LLMExecutor, LLMPlanner, LLMReplanner, PlanExecuteReplanAgent
-from oncallagent.chat_agent import ChatAgent
-from oncallagent.config import AppConfig
-from oncallagent.embedding import OllamaEmbeddingService
-from oncallagent.external_indexer import ExternalKnowledgeIndexer
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.llm import OpenAICompatibleChatModel
-from oncallagent.mcp import HttpJsonRpcTransport, MCPClient, MCPTool
-from oncallagent.qdrant import QdrantVectorStore
-from oncallagent.storage import ConversationStore, LazyPostgresStore
-from oncallagent.tools import KnowledgeSearchTool, PrometheusAlertsTool, TimeTool
+from oncallagent.agent.planner import LLMExecutor, LLMPlanner, LLMReplanner, PlanExecuteReplanAgent
+from oncallagent.agent.chat_agent import ChatAgent
+from oncallagent.infra.config import AppConfig
+from oncallagent.knowledge.embedding import OllamaEmbeddingService
+from oncallagent.knowledge.external import ExternalKnowledgeIndexer
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.infra.llm import OpenAICompatibleChatModel
+from oncallagent.tools.mcp import HttpJsonRpcTransport, MCPClient, MCPTool
+from oncallagent.knowledge.qdrant import QdrantVectorStore
+from oncallagent.storage.store import ConversationStore, LazyPostgresStore
+from oncallagent.tools.builtin import KnowledgeSearchTool, PrometheusAlertsTool, TimeTool
 
 
 def build_chat_model(cfg: AppConfig) -> OpenAICompatibleChatModel | None:

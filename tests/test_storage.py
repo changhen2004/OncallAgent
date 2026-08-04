@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from oncallagent.agent import PlanExecuteReplanAgent, PlanStep, ReplanDecision
-from oncallagent.chat_agent import ChatAgent, ChatMemory
-from oncallagent.harness import (
+from oncallagent.agent.planner import PlanExecuteReplanAgent, PlanStep, ReplanDecision
+from oncallagent.agent.chat_agent import ChatAgent, ChatMemory
+from oncallagent.agent.harness import (
     AgentState,
     Evidence,
     EvidenceType,
@@ -13,8 +13,8 @@ from oncallagent.harness import (
     ToolCallRecord,
     ToolCallStatus,
 )
-from oncallagent.llm import ChatMessage
-from oncallagent.storage import ConversationStore
+from oncallagent.infra.llm import ChatMessage
+from oncallagent.storage.store import ConversationStore
 
 
 # ------------------------------------------------------------------- Fake Store

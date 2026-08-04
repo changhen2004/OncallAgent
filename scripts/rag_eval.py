@@ -8,7 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from oncallagent.rag_eval import DEFAULT_EVAL_PATH, EvalReport, evaluate_default_runbooks
+from oncallagent.eval.rag_eval import DEFAULT_EVAL_PATH, EvalReport, evaluate_default_runbooks
 
 
 def main() -> None:

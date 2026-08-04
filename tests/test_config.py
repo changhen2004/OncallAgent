@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from oncallagent.config import load_config
+from oncallagent.infra.config import load_config
 
 
 def test_load_config_applies_go_compatible_defaults(tmp_path: Path) -> None:

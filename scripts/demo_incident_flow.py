@@ -7,7 +7,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from oncallagent.demo_flow import build_demo_flow_report, dumps_demo_flow_json
+from oncallagent.eval.demo_flow import build_demo_flow_report, dumps_demo_flow_json
 
 
 def main() -> None:

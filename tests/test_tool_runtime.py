@@ -5,7 +5,7 @@ import asyncio
 
 import pytest
 
-from oncallagent.harness import ToolCallStatus
+from oncallagent.agent.harness import ToolCallStatus
 
 
 class EchoTool:
@@ -42,7 +42,7 @@ class SlowTool:
 
 @pytest.mark.anyio
 async def test_tool_executor_records_success_with_input_output_and_duration() -> None:
-    from oncallagent.tool_runtime import ToolExecutor
+    from oncallagent.tools.runtime import ToolExecutor
 
     executor = ToolExecutor([EchoTool()], timeout_seconds=1.0)
 
@@ -62,7 +62,7 @@ async def test_tool_executor_records_success_with_input_output_and_duration() ->
 
 @pytest.mark.anyio
 async def test_tool_executor_validates_required_input_schema() -> None:
-    from oncallagent.tool_runtime import ToolExecutor
+    from oncallagent.tools.runtime import ToolExecutor
 
     executor = ToolExecutor([EchoTool()])
 
@@ -78,7 +78,7 @@ async def test_tool_executor_validates_required_input_schema() -> None:
 
 @pytest.mark.anyio
 async def test_tool_executor_records_exception_without_raising() -> None:
-    from oncallagent.tool_runtime import ToolExecutor
+    from oncallagent.tools.runtime import ToolExecutor
 
     executor = ToolExecutor([FailingTool()])
 
@@ -94,7 +94,7 @@ async def test_tool_executor_records_exception_without_raising() -> None:
 
 @pytest.mark.anyio
 async def test_tool_executor_enforces_timeout() -> None:
-    from oncallagent.tool_runtime import ToolExecutor
+    from oncallagent.tools.runtime import ToolExecutor
 
     executor = ToolExecutor([SlowTool()], timeout_seconds=0.01)
 
@@ -109,7 +109,7 @@ async def test_tool_executor_enforces_timeout() -> None:
 
 @pytest.mark.anyio
 async def test_tool_executor_records_missing_tool_as_skipped() -> None:
-    from oncallagent.tool_runtime import ToolExecutor
+    from oncallagent.tools.runtime import ToolExecutor
 
     executor = ToolExecutor([])
 

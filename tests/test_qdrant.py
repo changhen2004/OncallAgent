@@ -1,7 +1,7 @@
 import pytest
 
-from oncallagent.indexing import VectorPoint
-from oncallagent.qdrant import QdrantVectorStore
+from oncallagent.knowledge.indexing import VectorPoint
+from oncallagent.knowledge.qdrant import QdrantVectorStore
 
 
 @pytest.mark.anyio

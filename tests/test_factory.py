@@ -1,13 +1,13 @@
 import pytest
 
-from oncallagent.factory import (
+from oncallagent.infra.factory import (
     build_mcp_tools,
     build_optional_chat_agent,
     build_optional_external_indexer,
     build_optional_plan_agent,
 )
-from oncallagent.config import AppConfig, CLSMcpConfig, OpenAIConfig
-from oncallagent.knowledge import KnowledgeIndex
+from oncallagent.infra.config import AppConfig, CLSMcpConfig, OpenAIConfig
+from oncallagent.knowledge.index import KnowledgeIndex
 
 
 def test_build_optional_chat_agent_returns_none_without_api_key(tmp_path) -> None:

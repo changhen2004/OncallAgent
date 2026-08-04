@@ -5,9 +5,9 @@ from typing import Protocol
 
 import asyncpg
 
-from oncallagent.harness import AgentState, Evidence, ToolCallRecord, ToolCallStatus
-from oncallagent.llm import ChatMessage
-from oncallagent.migrations import run_migrations
+from oncallagent.agent.harness import AgentState, Evidence, ToolCallRecord, ToolCallStatus
+from oncallagent.infra.llm import ChatMessage
+from oncallagent.storage.migrations import run_migrations
 
 
 class ConversationStore(Protocol):

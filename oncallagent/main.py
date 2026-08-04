@@ -10,15 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from oncallagent.chat import ChatService
-from oncallagent.config import load_config
-from oncallagent.factory import (
+from oncallagent.services.chat import ChatService
+from oncallagent.infra.config import load_config
+from oncallagent.infra.factory import (
     build_optional_chat_agent,
     build_optional_external_indexer,
     build_optional_lazy_store,
 )
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.plan import PlanService
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.services.plan import PlanService
 
 
 class ChatRequest(BaseModel):

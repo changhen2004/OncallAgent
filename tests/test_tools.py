@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from oncallagent.tools import (
+from oncallagent.tools.builtin import (
     PrometheusAlertsTool,
     RagRetrieverNotConfigured,
     calculate_active_time,

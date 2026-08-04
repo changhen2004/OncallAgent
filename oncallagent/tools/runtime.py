@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 
-from oncallagent.harness import ToolCallRecord, ToolCallStatus
+from oncallagent.agent.harness import ToolCallRecord, ToolCallStatus
 
 
 class Tool(Protocol):

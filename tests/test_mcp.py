@@ -1,6 +1,6 @@
 import pytest
 
-from oncallagent.mcp import JsonRpcTransport, MCPClient, MCPTool
+from oncallagent.tools.mcp import JsonRpcTransport, MCPClient, MCPTool
 
 
 class FakeTransport(JsonRpcTransport):

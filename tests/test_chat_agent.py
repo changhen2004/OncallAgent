@@ -1,8 +1,8 @@
 import pytest
 
-from oncallagent.chat_agent import ChatAgent, ChatMemory
-from oncallagent.harness import RunStatus, StopReason
-from oncallagent.llm import ChatMessage
+from oncallagent.agent.chat_agent import ChatAgent, ChatMemory
+from oncallagent.agent.harness import RunStatus, StopReason
+from oncallagent.infra.llm import ChatMessage
 
 
 def test_chat_memory_keeps_last_window_messages() -> None:

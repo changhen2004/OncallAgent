@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from oncallagent.embedding import average_embeddings, normalize_embedding
+from oncallagent.knowledge.embedding import average_embeddings, normalize_embedding
 
 
 def test_average_embeddings_returns_arithmetic_mean() -> None:

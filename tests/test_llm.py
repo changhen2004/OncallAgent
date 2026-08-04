@@ -1,6 +1,6 @@
 import pytest
 
-from oncallagent.llm import ChatMessage, OpenAICompatibleChatModel
+from oncallagent.infra.llm import ChatMessage, OpenAICompatibleChatModel
 
 
 def test_chat_model_builds_openai_compatible_payload() -> None:

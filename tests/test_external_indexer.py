@@ -1,7 +1,7 @@
 import pytest
 
-from oncallagent.external_indexer import ExternalKnowledgeIndexer
-from oncallagent.indexing import VectorPoint
+from oncallagent.knowledge.external import ExternalKnowledgeIndexer
+from oncallagent.knowledge.indexing import VectorPoint
 
 
 class FakeEmbedder:

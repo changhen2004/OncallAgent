@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from oncallagent.knowledge import KnowledgeIndex
+from oncallagent.knowledge.index import KnowledgeIndex
 
 
 class RagRetrieverNotConfigured(RuntimeError):

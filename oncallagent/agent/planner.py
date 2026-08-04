@@ -6,9 +6,9 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
-from oncallagent.harness import AgentState, RunBudget, StopReason
-from oncallagent.llm import ChatMessage
-from oncallagent.storage import ConversationStore
+from oncallagent.agent.harness import AgentState, RunBudget, StopReason
+from oncallagent.infra.llm import ChatMessage
+from oncallagent.storage.store import ConversationStore
 
 
 @dataclass(frozen=True)

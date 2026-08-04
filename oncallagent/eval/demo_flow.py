@@ -5,9 +5,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.plan import PlanReport, PlanService
-from oncallagent.tools import simplify_prometheus_alerts
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.services.plan import PlanReport, PlanService
+from oncallagent.tools.builtin import simplify_prometheus_alerts
 
 SAMPLE_PROMETHEUS_ALERTS: dict[str, Any] = {
     "status": "success",

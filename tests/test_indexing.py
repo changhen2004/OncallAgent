@@ -1,4 +1,4 @@
-from oncallagent.indexing import DocumentChunk, VectorPoint, build_vector_points, split_markdown_by_h1
+from oncallagent.knowledge.indexing import DocumentChunk, VectorPoint, build_vector_points, split_markdown_by_h1
 import pytest
 
 

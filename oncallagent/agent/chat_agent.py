@@ -5,10 +5,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Protocol
 
-from oncallagent.harness import AgentState, RunBudget, StopReason, ToolCallRecord
-from oncallagent.llm import ChatMessage
-from oncallagent.storage import ConversationStore
-from oncallagent.tool_runtime import ToolExecutor
+from oncallagent.agent.harness import AgentState, RunBudget, StopReason, ToolCallRecord
+from oncallagent.infra.llm import ChatMessage
+from oncallagent.storage.store import ConversationStore
+from oncallagent.tools.runtime import ToolExecutor
 
 
 class Tool(Protocol):

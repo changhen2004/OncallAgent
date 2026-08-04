@@ -1,6 +1,6 @@
 import pytest
 
-from oncallagent.agent import LLMExecutor, LLMPlanner, LLMReplanner, PlanStep
+from oncallagent.agent.planner import LLMExecutor, LLMPlanner, LLMReplanner, PlanStep
 
 
 class FakeChatModel:

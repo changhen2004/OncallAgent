@@ -4,8 +4,8 @@ from collections import defaultdict
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.storage import ConversationStore
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.storage.store import ConversationStore
 
 
 class AgentChat(Protocol):

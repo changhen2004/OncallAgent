@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from oncallagent.knowledge import KnowledgeIndex
+from oncallagent.knowledge.index import KnowledgeIndex
 
 DEFAULT_EVAL_PATH = Path(__file__).resolve().parents[1] / "eval" / "rag_questions.json"
 

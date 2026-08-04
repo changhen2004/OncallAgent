@@ -5,7 +5,7 @@ import sys
 
 
 def test_demo_flow_report_connects_alerts_runbooks_and_agent_analysis() -> None:
-    from oncallagent.demo_flow import build_demo_flow_report
+    from oncallagent.eval.demo_flow import build_demo_flow_report
 
     report = build_demo_flow_report(docs_dir="docs/runbooks")
     markdown = report.to_markdown()

@@ -9,8 +9,8 @@ import pytest
 
 
 def test_evaluate_knowledge_index_reports_topk_hit_rates(tmp_path: Path) -> None:
-    from oncallagent.knowledge import KnowledgeIndex
-    from oncallagent.rag_eval import EvalQuestion, evaluate_knowledge_index
+    from oncallagent.knowledge.index import KnowledgeIndex
+    from oncallagent.eval.rag_eval import EvalQuestion, evaluate_knowledge_index
 
     (tmp_path / "latency.md").write_text("P95 latency Redis cache slow route", encoding="utf-8")
     (tmp_path / "error.md").write_text("5xx error rate MySQL Redis RabbitMQ", encoding="utf-8")
@@ -45,7 +45,7 @@ def test_evaluate_knowledge_index_reports_topk_hit_rates(tmp_path: Path) -> None
 
 
 def test_load_eval_questions_rejects_invalid_expected_file(tmp_path: Path) -> None:
-    from oncallagent.rag_eval import load_eval_questions
+    from oncallagent.eval.rag_eval import load_eval_questions
 
     eval_file = tmp_path / "questions.json"
     eval_file.write_text(
@@ -66,7 +66,7 @@ def test_load_eval_questions_rejects_invalid_expected_file(tmp_path: Path) -> No
 
 
 def test_default_rag_eval_dataset_covers_existing_runbooks() -> None:
-    from oncallagent.rag_eval import DEFAULT_EVAL_PATH, load_eval_questions
+    from oncallagent.eval.rag_eval import DEFAULT_EVAL_PATH, load_eval_questions
 
     docs_dir = Path("docs/runbooks")
 
@@ -92,7 +92,7 @@ def test_rag_eval_script_runs_from_repo_root() -> None:
 
 
 def test_default_rag_eval_reaches_full_top1_after_failure_sample_optimization() -> None:
-    from oncallagent.rag_eval import evaluate_default_runbooks
+    from oncallagent.eval.rag_eval import evaluate_default_runbooks
 
     report = evaluate_default_runbooks()
     non_top1_cases = [case.id for case in report.cases if case.hit_rank != 1]

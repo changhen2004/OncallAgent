@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from oncallagent.harness import (
+from oncallagent.agent.harness import (
     AgentState,
     Evidence,
     EvidenceType,

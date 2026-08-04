@@ -4,8 +4,8 @@ from typing import Protocol
 
 import httpx
 
-from oncallagent.embedding import normalize_embedding
-from oncallagent.indexing import VectorPoint
+from oncallagent.knowledge.embedding import normalize_embedding
+from oncallagent.knowledge.indexing import VectorPoint
 
 
 class AsyncEmbedder(Protocol):

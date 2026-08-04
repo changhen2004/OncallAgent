@@ -2,9 +2,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.plan import PlanService
-from oncallagent.tools import PrometheusAlertsTool
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.services.plan import PlanService
+from oncallagent.tools.builtin import PrometheusAlertsTool
 
 
 @pytest.mark.anyio

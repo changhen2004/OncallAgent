@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import httpx
 
-from oncallagent.knowledge import KnowledgeIndex
-from oncallagent.tools import PrometheusAlertsTool, simplify_prometheus_alerts
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.tools.builtin import PrometheusAlertsTool, simplify_prometheus_alerts
 
 
 @dataclass(frozen=True)

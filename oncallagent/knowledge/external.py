@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from oncallagent.embedding import EmbeddingService
-from oncallagent.indexing import VectorPoint, build_vector_points, split_markdown_by_h1
+from oncallagent.knowledge.embedding import EmbeddingService
+from oncallagent.knowledge.indexing import VectorPoint, build_vector_points, split_markdown_by_h1
 
 
 class VectorStore(Protocol):
