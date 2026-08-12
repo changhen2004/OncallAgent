@@ -29,7 +29,7 @@ class ChatService:
         if self.agent is not None:
             return await self.agent.chat(question, session_id)
 
-        results = self.knowledge.search(question)
+        results = await self.knowledge.search_hybrid(question)
         if results:
             context = "\n\n".join(result.content.strip() for result in results)
             answer = f"根据知识库检索结果，建议参考以下内容：\n{context}"

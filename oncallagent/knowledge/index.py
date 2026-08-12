@@ -1,34 +1,36 @@
 from __future__ import annotations
 
+import logging
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from fastapi import UploadFile
 
+from oncallagent.knowledge.retriever import SearchResult, VectorSearch, rrf_merge
+
+
+logger = logging.getLogger(__name__)
+
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_.-]+|[\u4e00-\u9fff]+")
 
 
-@dataclass(frozen=True)
-class SearchResult:
-    filename: str
-    content: str
-    score: int
-
-
 class ExternalIndexer(Protocol):
-    async def index_markdown(self, markdown: str) -> None:
+    async def index_markdown(self, markdown: str, *, source: str | None = None) -> None:
         pass
 
 
 class KnowledgeIndex:
     def __init__(
-        self, docs_dir: str | Path = "docs", external_indexer: ExternalIndexer | None = None
+        self,
+        docs_dir: str | Path = "docs",
+        external_indexer: ExternalIndexer | None = None,
+        vector_store: VectorSearch | None = None,
     ) -> None:
         self.docs_dir = Path(docs_dir)
         self.external_indexer = external_indexer
+        self.vector_store = vector_store
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self._documents: dict[str, str] = {}
         self.reload()
@@ -45,9 +47,31 @@ class KnowledgeIndex:
         target.write_bytes(content)
         markdown = content.decode("utf-8", errors="ignore")
         if self.external_indexer is not None:
-            await self.external_indexer.index_markdown(markdown)
+            await self.external_indexer.index_markdown(markdown, source=filename)
         self._documents[filename] = markdown
         return "上传成功"
+
+    async def search_hybrid(self, query: str, limit: int = 3) -> list[SearchResult]:
+        """Search with lexical ranking and, when configured, vector retrieval."""
+        lexical = self.search(query, limit=limit)
+        if self.vector_store is None:
+            return lexical
+        try:
+            vector = await self.vector_store.search(query, limit=limit)
+        except Exception:
+            logger.warning("vector search failed, falling back to lexical", exc_info=True)
+            return lexical
+        return rrf_merge(lexical, vector, limit=limit)
+
+    async def reindex_external(self) -> None:
+        """Best-effort re-index all known documents into the external store."""
+        if self.external_indexer is None:
+            return
+        for filename, markdown in self._documents.items():
+            try:
+                await self.external_indexer.index_markdown(markdown, source=filename)
+            except Exception:
+                logger.exception("external indexing failed for %s", filename)
 
     def search(self, query: str, limit: int = 3) -> list[SearchResult]:
         query_tokens = _tokenize(query)

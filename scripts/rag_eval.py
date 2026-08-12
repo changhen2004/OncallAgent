@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -8,7 +9,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from oncallagent.eval.rag_eval import DEFAULT_EVAL_PATH, EvalReport, evaluate_default_runbooks
+from oncallagent.eval.rag_eval import (
+    DEFAULT_EVAL_PATH,
+    EvalReport,
+    evaluate_default_runbooks,
+    evaluate_knowledge_index_hybrid,
+    load_eval_questions,
+)
 
 
 def main() -> None:
@@ -17,17 +24,48 @@ def main() -> None:
     parser.add_argument("--eval-file", default=str(DEFAULT_EVAL_PATH))
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    parser.add_argument(
+        "--retriever",
+        choices=["lexical", "hybrid"],
+        default="lexical",
+        help="lexical-only (offline) or hybrid lexical + Qdrant vector retrieval",
+    )
     args = parser.parse_args()
 
-    report = evaluate_default_runbooks(
-        docs_dir=Path(args.docs_dir),
-        eval_file=Path(args.eval_file),
-        top_k=args.top_k,
-    )
+    if args.retriever == "hybrid":
+        report = asyncio.run(_evaluate_hybrid(args))
+    else:
+        report = evaluate_default_runbooks(
+            docs_dir=Path(args.docs_dir),
+            eval_file=Path(args.eval_file),
+            top_k=args.top_k,
+        )
     if args.format == "json":
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
         return
     print(_format_markdown(report))
+
+
+async def _evaluate_hybrid(args) -> EvalReport:
+    from oncallagent.infra.config import load_config
+    from oncallagent.infra.factory import (
+        build_optional_embedder,
+        build_optional_external_indexer,
+        build_optional_vector_store,
+    )
+    from oncallagent.knowledge.index import KnowledgeIndex
+
+    docs_path = Path(args.docs_dir)
+    questions = load_eval_questions(args.eval_file, docs_dir=docs_path)
+    config = load_config()
+    embedder = build_optional_embedder(config)
+    vector_store = build_optional_vector_store(config, embedder)
+    indexer = build_optional_external_indexer(
+        config, enabled=True, embedder=embedder, vector_store=vector_store
+    )
+    knowledge = KnowledgeIndex(docs_path, external_indexer=indexer, vector_store=vector_store)
+    await knowledge.reindex_external()
+    return await evaluate_knowledge_index_hybrid(knowledge, questions, top_k=args.top_k)
 
 
 def _format_markdown(report: EvalReport) -> str:

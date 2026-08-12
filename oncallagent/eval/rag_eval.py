@@ -7,7 +7,7 @@ from typing import Any
 
 from oncallagent.knowledge.index import KnowledgeIndex
 
-DEFAULT_EVAL_PATH = Path(__file__).resolve().parents[1] / "eval" / "rag_questions.json"
+DEFAULT_EVAL_PATH = Path(__file__).resolve().parents[2] / "eval" / "rag_questions.json"
 
 
 @dataclass(frozen=True)
@@ -121,6 +121,34 @@ def evaluate_default_runbooks(
     docs_path = Path(docs_dir)
     questions = load_eval_questions(eval_file, docs_dir=docs_path)
     return evaluate_knowledge_index(KnowledgeIndex(docs_path), questions, top_k=top_k)
+
+
+async def evaluate_knowledge_index_hybrid(
+    knowledge: KnowledgeIndex, questions: list[EvalQuestion], *, top_k: int = 3
+) -> EvalReport:
+    cases: list[EvalCaseResult] = []
+    for question in questions:
+        retrieved_files = [
+            result.filename
+            for result in await knowledge.search_hybrid(question.question, limit=top_k)
+        ]
+        hit_rank = _hit_rank(retrieved_files, question.expected_file)
+        cases.append(
+            EvalCaseResult(
+                id=question.id,
+                question=question.question,
+                expected_file=question.expected_file,
+                retrieved_files=retrieved_files,
+                hit_rank=hit_rank,
+            )
+        )
+
+    return EvalReport(
+        total=len(cases),
+        top1_hits=sum(case.top1_hit for case in cases),
+        top3_hits=sum(case.top3_hit for case in cases),
+        cases=cases,
+    )
 
 
 def _required_string(item: dict[str, Any], key: str, index: int) -> str:

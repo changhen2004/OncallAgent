@@ -14,8 +14,10 @@ from oncallagent.services.chat import ChatService
 from oncallagent.infra.config import load_config
 from oncallagent.infra.factory import (
     build_optional_chat_agent,
+    build_optional_embedder,
     build_optional_external_indexer,
     build_optional_lazy_store,
+    build_optional_vector_store,
 )
 from oncallagent.knowledge.index import KnowledgeIndex
 from oncallagent.services.plan import PlanService
@@ -34,10 +36,16 @@ def create_app(
     enable_external_indexing: bool = False,
 ) -> FastAPI:
     config = load_config(config_path)
-    external_indexer = build_optional_external_indexer(
-        config, enabled=enable_external_indexing
+    embedder = build_optional_embedder(config) if enable_external_indexing else None
+    vector_store = (
+        build_optional_vector_store(config, embedder) if enable_external_indexing else None
     )
-    knowledge = KnowledgeIndex(docs_dir, external_indexer=external_indexer)
+    external_indexer = build_optional_external_indexer(
+        config, enabled=enable_external_indexing, embedder=embedder, vector_store=vector_store
+    )
+    knowledge = KnowledgeIndex(
+        docs_dir, external_indexer=external_indexer, vector_store=vector_store
+    )
 
     # Lazily-initialised PostgreSQL store (None → in-memory-only fallback).
     lazy_store = build_optional_lazy_store(config)
@@ -48,6 +56,8 @@ def create_app(
     # Lifespan: only used to close the pool on shutdown.
     @asynccontextmanager
     async def _lifespan(app: FastAPI):
+        if enable_external_indexing:
+            await knowledge.reindex_external()
         yield
         if lazy_store is not None:
             await lazy_store.close()

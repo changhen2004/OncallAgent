@@ -22,7 +22,7 @@ async def test_external_indexer_splits_embeds_and_upserts_markdown() -> None:
     store = FakeVectorStore()
     indexer = ExternalKnowledgeIndexer(embedder=FakeEmbedder(), vector_store=store)
 
-    await indexer.index_markdown("# Latency\nrestart cache")
+    await indexer.index_markdown("# Latency\nrestart cache", source="latency.md")
 
     assert len(store.points) == 1
-    assert store.points[0].payload == {"content": "Latency\nrestart cache"}
+    assert store.points[0].payload == {"content": "Latency\nrestart cache", "source": "latency.md"}

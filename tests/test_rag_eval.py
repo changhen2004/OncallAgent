@@ -99,3 +99,29 @@ def test_default_rag_eval_reaches_full_top1_after_failure_sample_optimization() 
 
     assert report.top1_hits == report.total
     assert non_top1_cases == []
+
+
+@pytest.mark.anyio
+async def test_evaluate_knowledge_index_hybrid_uses_vector_results(tmp_path: Path) -> None:
+    from oncallagent.eval.rag_eval import EvalQuestion, evaluate_knowledge_index_hybrid
+    from oncallagent.knowledge.index import KnowledgeIndex
+
+    (tmp_path / "error.md").write_text("5xx error rate high", encoding="utf-8")
+
+    class FakeVectorStore:
+        async def search(self, query: str, *, limit: int = 3, score_threshold: float = 0.5):
+            return [{"source": "error.md", "content": "5xx steps", "score": 0.9}]
+
+    questions = [
+        EvalQuestion(
+            id="q1",
+            question="错误率升高的时候应该参考哪份手册",
+            expected_file="error.md",
+        )
+    ]
+    knowledge = KnowledgeIndex(tmp_path, vector_store=FakeVectorStore())
+
+    report = await evaluate_knowledge_index_hybrid(knowledge, questions, top_k=3)
+
+    assert report.top1_hits == 1
+    assert report.cases[0].hit_rank == 1

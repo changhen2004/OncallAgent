@@ -45,7 +45,7 @@ async def test_chat_model_extracts_first_choice_content(monkeypatch: pytest.Monk
             captured["headers"] = headers
             return FakeResponse()
 
-    monkeypatch.setattr("oncallagent.llm.httpx.AsyncClient", FakeClient)
+    monkeypatch.setattr("oncallagent.infra.llm.httpx.AsyncClient", FakeClient)
     model = OpenAICompatibleChatModel(
         api_key="sk-test",
         model="test-model",

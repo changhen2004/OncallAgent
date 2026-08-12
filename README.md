@@ -4,13 +4,13 @@
 
 ## 核心能力
 
-- **RAG 知识库**：Markdown 运维手册构建本地轻量索引；可切换 Ollama Embedding + Qdrant 向量检索
+- **RAG 知识库**：Markdown 运维手册构建本地轻量索引；可选 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
 - **工具调用**：内置时间 / 知识库检索 / Prometheus 告警工具，支持 OpenAI 兼容模型函数调用
 - **告警计划分析**：Plan-Execute-Replan 工作流，自动获取活跃告警、命中 runbook、生成处理建议
 - **流式对话**：SSE 多轮会话，支持知识库命中回复与工具调用轨迹
 - **会话持久化**：可选 PostgreSQL 持久化对话消息、工具调用审计与 Agent Run 状态
 - **降级可用**：Prometheus / PostgreSQL / LLM 任一不可用时自动降级，本地开箱即跑
-- **可验证**：20 个测试文件 / 69 个 pytest 用例 + 30 条告警问题的 RAG 评估集
+- **可验证**：21 个测试文件 / 82 个 pytest 用例 + 30 条告警问题的 RAG 评估集（词法 + 混合双路径）
 
 ## 架构
 
@@ -23,7 +23,7 @@
 │  Services：ChatService / ChatAgent        PlanService /     │
 │            PlanExecuteReplanAgent                          │
 ├────────────────────────────────────────────────────────────┤
-│  Knowledge：KnowledgeIndex（本地检索）                       │
+│  Knowledge：KnowledgeIndex（本地检索 + RRF 混合）            │
 │             ExternalKnowledgeIndexer（Ollama + Qdrant）     │
 ├────────────────────────────────────────────────────────────┤
 │  Tools：TimeTool / KnowledgeSearchTool / PrometheusAlerts   │

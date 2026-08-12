@@ -146,5 +146,5 @@ class KnowledgeSearchTool:
 
     async def call(self, arguments: dict) -> str:
         query = str(arguments.get("query", ""))
-        results = self.knowledge.search(query)
+        results = await self.knowledge.search_hybrid(query)
         return "\n\n".join(result.content for result in results)

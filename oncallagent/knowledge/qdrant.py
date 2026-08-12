@@ -22,12 +22,16 @@ class QdrantVectorStore:
         vector_size: int = 768,
         embedder: AsyncEmbedder | None = None,
         timeout: float = 10.0,
+        top_k: int = 2,
+        score_threshold: float = 0.5,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.collection = collection
         self.vector_size = vector_size
         self.embedder = embedder
         self.timeout = timeout
+        self.top_k = top_k
+        self.score_threshold = score_threshold
 
     async def recreate_collection(self) -> None:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -63,7 +67,11 @@ class QdrantVectorStore:
             response.raise_for_status()
 
     async def search(
-        self, query: str, *, limit: int = 2, score_threshold: float = 0.5
+        self,
+        query: str,
+        *,
+        limit: int | None = None,
+        score_threshold: float | None = None,
     ) -> list[dict]:
         if self.embedder is None:
             raise RuntimeError("qdrant retriever embedder is not configured")
@@ -71,8 +79,8 @@ class QdrantVectorStore:
         vector = normalize_embedding(embeddings[0])
         request = {
             "vector": vector,
-            "limit": limit,
-            "score_threshold": score_threshold,
+            "limit": self.top_k if limit is None else limit,
+            "score_threshold": self.score_threshold if score_threshold is None else score_threshold,
             "with_payload": True,
         }
         async with httpx.AsyncClient(timeout=self.timeout) as client:

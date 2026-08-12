@@ -42,7 +42,7 @@ async def test_recreate_collection_deletes_existing_and_creates_dot_collection(
             calls.append(("PUT", url, json))
             return FakeResponse()
 
-    monkeypatch.setattr("oncallagent.qdrant.httpx.AsyncClient", FakeClient)
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
     store = QdrantVectorStore("http://qdrant:6333", "oncallagent", vector_size=768)
 
     await store.recreate_collection()
@@ -81,7 +81,7 @@ async def test_upsert_points_sends_vectors_and_payload(monkeypatch: pytest.Monke
             captured["json"] = json
             return FakeResponse()
 
-    monkeypatch.setattr("oncallagent.qdrant.httpx.AsyncClient", FakeClient)
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
     store = QdrantVectorStore("http://qdrant:6333", "oncallagent")
 
     await store.upsert_points([VectorPoint(id="p1", vector=[0.1, 0.2], payload={"content": "doc"})])
@@ -123,7 +123,7 @@ async def test_search_embeds_normalizes_and_queries_qdrant(monkeypatch: pytest.M
             captured["json"] = json
             return FakeResponse()
 
-    monkeypatch.setattr("oncallagent.qdrant.httpx.AsyncClient", FakeClient)
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
     store = QdrantVectorStore("http://qdrant:6333", "oncallagent", embedder=FakeEmbedder())
 
     results = await store.search("latency", limit=2, score_threshold=0.5)
@@ -133,3 +133,53 @@ async def test_search_embeds_normalizes_and_queries_qdrant(monkeypatch: pytest.M
         "json": {"vector": [0.6, 0.8], "limit": 2, "score_threshold": 0.5, "with_payload": True},
     }
     assert results == [{"content": "doc", "score": 0.9}]
+
+
+@pytest.mark.anyio
+async def test_search_uses_configured_defaults_when_overrides_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeEmbedder:
+        async def embed(self, texts: list[str]) -> list[list[float]]:
+            return [[3.0, 4.0]]
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"result": []}
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def post(self, url: str, json: dict):
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
+    store = QdrantVectorStore(
+        "http://qdrant:6333",
+        "oncallagent",
+        embedder=FakeEmbedder(),
+        top_k=4,
+        score_threshold=0.3,
+    )
+
+    await store.search("latency")
+
+    assert captured["json"] == {
+        "vector": [0.6, 0.8],
+        "limit": 4,
+        "score_threshold": 0.3,
+        "with_payload": True,
+    }

@@ -7,12 +7,14 @@
     "host": "127.0.0.1",
     "port": 11434,
     "model": "nomic-embed-text",
-    "dimension": 384
+    "dimension": 768
   },
   "qdrant": {
     "host": "127.0.0.1",
-    "port": 6334,
-    "collection": "oncallagent"
+    "port": 6333,
+    "collection": "oncallagent",
+    "top_k": 2,
+    "score_threshold": 0.5
   },
   "openai": {
     "api_key": "xxx",

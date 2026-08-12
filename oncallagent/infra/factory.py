@@ -67,18 +67,34 @@ def build_optional_plan_agent(
     )
 
 
-def build_optional_external_indexer(
-    cfg: AppConfig, *, enabled: bool = False
-) -> ExternalKnowledgeIndexer | None:
-    if not enabled:
-        return None
-    embedder = OllamaEmbeddingService(cfg.get_embedder_addr(), cfg.embedder.model)
-    vector_store = QdrantVectorStore(
+def build_optional_embedder(cfg: AppConfig) -> OllamaEmbeddingService:
+    return OllamaEmbeddingService(cfg.get_embedder_addr(), cfg.embedder.model)
+
+
+def build_optional_vector_store(
+    cfg: AppConfig, embedder: OllamaEmbeddingService
+) -> QdrantVectorStore:
+    return QdrantVectorStore(
         f"http://{cfg.get_qdrant_addr()}",
         cfg.qdrant.collection,
         vector_size=cfg.embedder.dimension,
         embedder=embedder,
+        top_k=cfg.qdrant.top_k,
+        score_threshold=cfg.qdrant.score_threshold,
     )
+
+
+def build_optional_external_indexer(
+    cfg: AppConfig,
+    *,
+    enabled: bool = False,
+    embedder: OllamaEmbeddingService | None = None,
+    vector_store: QdrantVectorStore | None = None,
+) -> ExternalKnowledgeIndexer | None:
+    if not enabled:
+        return None
+    embedder = embedder or build_optional_embedder(cfg)
+    vector_store = vector_store or build_optional_vector_store(cfg, embedder)
     return ExternalKnowledgeIndexer(embedder=embedder, vector_store=vector_store)
 
 

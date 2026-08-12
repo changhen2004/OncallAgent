@@ -15,13 +15,15 @@ class EmbedderConfig(BaseModel):
     host: str = "localhost"
     port: int = 11434
     model: str = "nomic-embed-text"
-    dimension: int = 384
+    dimension: int = 768
 
 
 class QdrantConfig(BaseModel):
     host: str = "localhost"
-    port: int = 6334
+    port: int = 6333
     collection: str = "oncallagent"
+    top_k: int = 2
+    score_threshold: float = 0.5
 
 
 class PrometheusConfig(BaseModel):
