@@ -36,10 +36,19 @@ def normalize_embedding(embedding: list[float]) -> list[float]:
 
 
 class OllamaEmbeddingService:
-    def __init__(self, base_url: str, model: str, timeout: float = 30.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        timeout: float = 30.0,
+        passage_prefix: str = "",
+        query_prefix: str = "",
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.passage_prefix = passage_prefix
+        self.query_prefix = query_prefix
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         embeddings: list[list[float]] = []

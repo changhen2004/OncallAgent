@@ -25,4 +25,29 @@ async def test_external_indexer_splits_embeds_and_upserts_markdown() -> None:
     await indexer.index_markdown("# Latency\nrestart cache", source="latency.md")
 
     assert len(store.points) == 1
-    assert store.points[0].payload == {"content": "Latency\nrestart cache", "source": "latency.md"}
+    assert store.points[0].payload == {
+        "content": "# Latency\nrestart cache",
+        "heading": "Latency",
+        "source": "latency.md",
+    }
+
+
+@pytest.mark.anyio
+async def test_external_indexer_attaches_runbook_metadata_to_payload() -> None:
+    store = FakeVectorStore()
+    indexer = ExternalKnowledgeIndexer(embedder=FakeEmbedder(), vector_store=store)
+    markdown = (
+        "# Error Manual\n"
+        "## 适用告警\n"
+        "- 告警名：`HighErrorRate`\n"
+        "- 重点指标：`http_requests_total`\n"
+        "## Steps\nrestart cache workers"
+    )
+
+    await indexer.index_markdown(markdown, source="error.md")
+
+    assert len(store.points) == 2
+    for point in store.points:
+        assert point.payload["source"] == "error.md"
+        assert point.payload["alertname"] == "HighErrorRate"
+        assert point.payload["metrics"] == ["http_requests_total"]

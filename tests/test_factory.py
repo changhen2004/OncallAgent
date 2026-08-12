@@ -52,6 +52,15 @@ def test_build_optional_vector_store_applies_configured_defaults() -> None:
     assert store.score_threshold == 0.3
 
 
+def test_build_optional_embedder_applies_prefix_defaults() -> None:
+    cfg = AppConfig()
+
+    embedder = build_optional_embedder(cfg)
+
+    assert embedder.passage_prefix == "search_document:"
+    assert embedder.query_prefix == "search_query:"
+
+
 def test_build_optional_external_indexer_wires_embedder_and_vector_store() -> None:
     cfg = AppConfig(qdrant=QdrantConfig(port=6333, top_k=4, score_threshold=0.3))
 

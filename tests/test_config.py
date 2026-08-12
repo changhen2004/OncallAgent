@@ -16,6 +16,8 @@ def test_load_config_applies_go_compatible_defaults(tmp_path: Path) -> None:
     assert cfg.embedder.port == 11434
     assert cfg.embedder.model == "nomic-embed-text"
     assert cfg.embedder.dimension == 768
+    assert cfg.embedder.passage_prefix == "search_document:"
+    assert cfg.embedder.query_prefix == "search_query:"
     assert cfg.qdrant.collection == "oncallagent"
     assert cfg.qdrant.port == 6333
     assert cfg.qdrant.top_k == 2

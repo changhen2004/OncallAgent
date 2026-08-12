@@ -7,7 +7,9 @@
     "host": "127.0.0.1",
     "port": 11434,
     "model": "nomic-embed-text",
-    "dimension": 768
+    "dimension": 768,
+    "passage_prefix": "search_document:",
+    "query_prefix": "search_query:"
   },
   "qdrant": {
     "host": "127.0.0.1",

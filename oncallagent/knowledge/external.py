@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Protocol
 
 from oncallagent.knowledge.embedding import EmbeddingService
-from oncallagent.knowledge.indexing import VectorPoint, build_vector_points, split_markdown_by_h1
+from oncallagent.knowledge.indexing import (
+    VectorPoint,
+    build_vector_points,
+    extract_runbook_metadata,
+    split_markdown,
+)
 
 
 class VectorStore(Protocol):
@@ -12,22 +17,37 @@ class VectorStore(Protocol):
 
 
 class ExternalKnowledgeIndexer:
-    def __init__(self, *, embedder: EmbeddingService, vector_store: VectorStore) -> None:
+    def __init__(
+        self,
+        *,
+        embedder: EmbeddingService,
+        vector_store: VectorStore,
+        max_chunk_chars: int = 1500,
+        overlap_chars: int = 100,
+    ) -> None:
         self.embedder = embedder
         self.vector_store = vector_store
+        self.max_chunk_chars = max_chunk_chars
+        self.overlap_chars = overlap_chars
 
     async def index_markdown(self, markdown: str, *, source: str | None = None) -> None:
-        chunks = split_markdown_by_h1(markdown)
+        chunks = split_markdown(
+            markdown,
+            max_chunk_chars=self.max_chunk_chars,
+            overlap_chars=self.overlap_chars,
+        )
         points = await build_vector_points(chunks, self.embedder)
         if not points:
             return
-        if source is not None:
-            points = [
-                VectorPoint(
-                    id=point.id,
-                    vector=point.vector,
-                    payload={**point.payload, "source": source},
-                )
-                for point in points
-            ]
-        await self.vector_store.upsert_points(points)
+        metadata = extract_runbook_metadata(markdown)
+        enriched: list[VectorPoint] = []
+        for point in points:
+            payload = dict(point.payload)
+            if source is not None:
+                payload["source"] = source
+            if metadata["alertname"]:
+                payload["alertname"] = metadata["alertname"]
+            if metadata["metrics"]:
+                payload["metrics"] = metadata["metrics"]
+            enriched.append(VectorPoint(id=point.id, vector=point.vector, payload=payload))
+        await self.vector_store.upsert_points(enriched)

@@ -16,6 +16,8 @@ class EmbedderConfig(BaseModel):
     port: int = 11434
     model: str = "nomic-embed-text"
     dimension: int = 768
+    passage_prefix: str = "search_document:"
+    query_prefix: str = "search_query:"
 
 
 class QdrantConfig(BaseModel):

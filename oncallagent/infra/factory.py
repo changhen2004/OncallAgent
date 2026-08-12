@@ -68,7 +68,12 @@ def build_optional_plan_agent(
 
 
 def build_optional_embedder(cfg: AppConfig) -> OllamaEmbeddingService:
-    return OllamaEmbeddingService(cfg.get_embedder_addr(), cfg.embedder.model)
+    return OllamaEmbeddingService(
+        cfg.get_embedder_addr(),
+        cfg.embedder.model,
+        passage_prefix=cfg.embedder.passage_prefix,
+        query_prefix=cfg.embedder.query_prefix,
+    )
 
 
 def build_optional_vector_store(
