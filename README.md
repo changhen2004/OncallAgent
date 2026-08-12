@@ -10,7 +10,7 @@
 - **流式对话**：SSE 多轮会话，支持知识库命中回复与工具调用轨迹
 - **会话持久化**：可选 PostgreSQL 持久化对话消息、工具调用审计与 Agent Run 状态
 - **降级可用**：Prometheus / PostgreSQL / LLM 任一不可用时自动降级，本地开箱即跑
-- **可验证**：21 个测试文件 / 82 个 pytest 用例 + 30 条告警问题的 RAG 评估集（词法 + 混合双路径）
+- **可验证**：22 个测试文件 / 101 个 pytest 用例 + 40 条 RAG 评估集（告警原文、日志、口语化与负例，词法 + 混合双路径）
 
 ## 架构
 
@@ -93,7 +93,7 @@ docker compose -f docker-compose.prometheus.yml up -d
 ### 1. RAG 检索：面向中文运维场景的命中率优化
 
 - 本地索引对中文采用 **bigram/trigram 连续片段切分**，避免单字拆分带来的泛化噪声；文件名与 Markdown 标题命中加权，日志原文 / 指标类英文短语整段匹配加分
-- 用 30 条真实告警问题做回归评估：**Top1 命中率 93.3% → 100%，Top3 100%**（见 `docs/evaluation/rag-eval.md`）
+- 用 40 条问题做回归评估：**Top1 97.3%，Top3 100%，MRR 0.987，NDCG@3 0.990，负例误召回 1/3**（见 `docs/evaluation/rag-eval.md`）
 - 可扩展外部索引：开启后通过 Ollama Embedding 分块写入 Qdrant，检索链路可插拔
 
 ### 2. Agent 工具调用治理
@@ -127,7 +127,7 @@ uv run python scripts/demo_incident_flow.py           # 告警 → Runbook → A
 ```
 
 - 测试覆盖：API 行为、配置加载、工具调用、告警分析、RAG 检索评估、存储持久化等
-- 评估集：`eval/rag_questions.json`（30 条真实告警问题）
+- 评估集：`eval/rag_questions.json`（40 条，含告警原文、日志片段、口语化提问与负例）
 
 ## 与 GoCommunity 联动
 
