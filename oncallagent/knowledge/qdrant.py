@@ -72,10 +72,13 @@ class QdrantVectorStore:
         *,
         limit: int | None = None,
         score_threshold: float | None = None,
+        payload_filter: dict | None = None,
     ) -> list[dict]:
         if self.embedder is None:
             raise RuntimeError("qdrant retriever embedder is not configured")
-        embeddings = await self.embedder.embed([query])
+        query_prefix = getattr(self.embedder, "query_prefix", "") or ""
+        query_text = f"{query_prefix} {query}".strip() if query_prefix else query
+        embeddings = await self.embedder.embed([query_text])
         vector = normalize_embedding(embeddings[0])
         request = {
             "vector": vector,
@@ -83,6 +86,8 @@ class QdrantVectorStore:
             "score_threshold": self.score_threshold if score_threshold is None else score_threshold,
             "with_payload": True,
         }
+        if payload_filter is not None:
+            request["filter"] = payload_filter
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/collections/{self.collection}/points/search",

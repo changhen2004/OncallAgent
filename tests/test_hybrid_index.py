@@ -9,7 +9,14 @@ class FakeVectorStore:
         self.error = error
         self.queries: list[str] = []
 
-    async def search(self, query: str, *, limit: int = 3, score_threshold: float = 0.5):
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 3,
+        score_threshold: float = 0.5,
+        payload_filter: dict | None = None,
+    ):
         self.queries.append(query)
         if self.error is not None:
             raise self.error
@@ -94,3 +101,30 @@ async def test_save_upload_indexes_external_with_source(tmp_path) -> None:
     await knowledge.save_upload(FakeUploadFile())
 
     assert indexer.calls == [("latency.md", "# Latency\nrestart cache")]
+
+
+@pytest.mark.anyio
+async def test_search_hybrid_passes_payload_filter_to_vector_store(tmp_path) -> None:
+    (tmp_path / "error.md").write_text("5xx error rate high", encoding="utf-8")
+
+    class FilterVectorStore:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, int, dict | None]] = []
+
+        async def search(
+            self,
+            query: str,
+            *,
+            limit: int = 3,
+            score_threshold: float = 0.5,
+            payload_filter: dict | None = None,
+        ):
+            self.calls.append((query, limit, payload_filter))
+            return []
+
+    vector = FilterVectorStore()
+    knowledge = KnowledgeIndex(tmp_path, vector_store=vector)
+
+    await knowledge.search_hybrid("5xx", limit=3, payload_filter={"must": []})
+
+    assert vector.calls == [("5xx", 3, {"must": []})]

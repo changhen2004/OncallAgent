@@ -183,3 +183,86 @@ async def test_search_uses_configured_defaults_when_overrides_omitted(
         "score_threshold": 0.3,
         "with_payload": True,
     }
+
+
+@pytest.mark.anyio
+async def test_search_includes_payload_filter_when_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeEmbedder:
+        async def embed(self, texts: list[str]) -> list[list[float]]:
+            return [[3.0, 4.0]]
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"result": []}
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def post(self, url: str, json: dict):
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
+    store = QdrantVectorStore("http://qdrant:6333", "oncallagent", embedder=FakeEmbedder())
+    payload_filter = {"must": [{"key": "alertname", "match": {"value": "HighErrorRate"}}]}
+
+    await store.search("latency", payload_filter=payload_filter)
+
+    assert captured["json"]["filter"] == payload_filter
+
+
+@pytest.mark.anyio
+async def test_search_applies_query_prefix_from_embedder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class PrefixedEmbedder:
+        query_prefix = "search_query:"
+
+        async def embed(self, texts: list[str]) -> list[list[float]]:
+            captured["texts"] = texts
+            return [[3.0, 4.0]]
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"result": []}
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def post(self, url: str, json: dict):
+            return FakeResponse()
+
+    monkeypatch.setattr("oncallagent.knowledge.qdrant.httpx.AsyncClient", FakeClient)
+    store = QdrantVectorStore(
+        "http://qdrant:6333", "oncallagent", embedder=PrefixedEmbedder()
+    )
+
+    await store.search("latency")
+
+    assert captured["texts"] == ["search_query: latency"]

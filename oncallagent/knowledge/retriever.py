@@ -14,7 +14,12 @@ class SearchResult:
 
 class VectorSearch(Protocol):
     async def search(
-        self, query: str, *, limit: int = 3, score_threshold: float = 0.5
+        self,
+        query: str,
+        *,
+        limit: int = 3,
+        score_threshold: float = 0.5,
+        payload_filter: dict | None = None,
     ) -> list[dict]:
         pass
 

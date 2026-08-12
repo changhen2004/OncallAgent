@@ -51,13 +51,20 @@ class KnowledgeIndex:
         self._documents[filename] = markdown
         return "上传成功"
 
-    async def search_hybrid(self, query: str, limit: int = 3) -> list[SearchResult]:
+    async def search_hybrid(
+        self,
+        query: str,
+        limit: int = 3,
+        payload_filter: dict | None = None,
+    ) -> list[SearchResult]:
         """Search with lexical ranking and, when configured, vector retrieval."""
         lexical = self.search(query, limit=limit)
         if self.vector_store is None:
             return lexical
         try:
-            vector = await self.vector_store.search(query, limit=limit)
+            vector = await self.vector_store.search(
+                query, limit=limit, payload_filter=payload_filter
+            )
         except Exception:
             logger.warning("vector search failed, falling back to lexical", exc_info=True)
             return lexical

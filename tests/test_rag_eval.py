@@ -109,7 +109,14 @@ async def test_evaluate_knowledge_index_hybrid_uses_vector_results(tmp_path: Pat
     (tmp_path / "error.md").write_text("5xx error rate high", encoding="utf-8")
 
     class FakeVectorStore:
-        async def search(self, query: str, *, limit: int = 3, score_threshold: float = 0.5):
+        async def search(
+            self,
+            query: str,
+            *,
+            limit: int = 3,
+            score_threshold: float = 0.5,
+            payload_filter: dict | None = None,
+        ):
             return [{"source": "error.md", "content": "5xx steps", "score": 0.9}]
 
     questions = [
