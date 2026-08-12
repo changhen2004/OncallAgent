@@ -4,7 +4,7 @@
 
 ## 核心能力
 
-- **RAG 知识库**：Markdown 运维手册构建本地轻量索引；可选 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
+- **RAG 知识库**：Markdown 运维手册按标题层级切分、超长重叠二次切分；可选 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
 - **工具调用**：内置时间 / 知识库检索 / Prometheus 告警工具，支持 OpenAI 兼容模型函数调用
 - **告警计划分析**：Plan-Execute-Replan 工作流，自动获取活跃告警、命中 runbook、生成处理建议
 - **流式对话**：SSE 多轮会话，支持知识库命中回复与工具调用轨迹

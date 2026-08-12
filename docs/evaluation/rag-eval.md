@@ -86,3 +86,23 @@ Top3 hits: 30/30 (100.00%)
 lexical: 30/30 Top1, 30/30 Top3
 hybrid : 30/30 Top1, 30/30 Top3（Qdrant 不可用时与 lexical 一致）
 ```
+
+## P1：切分与索引质量（已完成）
+
+### 变更内容
+
+- 分层切分：`split_markdown` 按 H1/H2/H3 标题层级递归切分，chunk 保留祖先标题作为上下文，并记录标题路径（如 `Manual > Steps`）；代码围栏内的 `#` 行不会误判为标题。
+- 超长二次切分：超过 `max_chunk_chars`（默认 1500 字符）的章节按行边界切分，相邻 chunk 保留 `overlap_chars`（默认 100 字符）重叠，避免跨边界丢失上下文。
+- 元数据 payload：每个向量点携带 `heading` 标题路径、`source` 文件名，并从 runbook 的“适用告警”段落提取 `alertname` 与 `metrics` 指标名，支持 Qdrant payload filter 按告警过滤。
+- 嵌入模板：检索侧使用 `search_query:` 前缀、文档侧使用 `search_document:` 前缀（`embedder.passage_prefix` / `query_prefix` 可配置），标题加权保留（own heading ×2 + 祖先标题）。
+- Qdrant 检索支持 `payload_filter` 透传（`QdrantVectorStore.search` 与 `KnowledgeIndex.search_hybrid`）。
+
+### 使用方式
+
+混合检索会先按新切分策略重建索引：
+
+```bash
+/home/chg/.local/bin/uv run python scripts/rag_eval.py --retriever hybrid --format markdown
+```
+
+本地测试与离线评估不依赖上述外部能力，`scripts/rag_eval.py`（lexical）与 `scripts/demo_incident_flow.py` 行为不变。
