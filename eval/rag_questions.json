@@ -148,5 +148,55 @@
     "id": "backlog-007",
     "question": "本地压测流量过大，单个 Worker 消费速度不足，队列积压恢复演练怎么做？",
     "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "alert-001",
+    "question": "ResourceCommunityHighP95Latency 告警持续 firing：resource_community_go 后端 P95 延迟超过 500ms，resource_community_http_request_duration_seconds_bucket 出现异常，需要人工介入。",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "alert-002",
+    "question": "ResourceCommunityHighErrorRate 告警触发：resource_community_go 1 分钟内 5xx 错误率超过 5%，resource_community_http_requests_total 中 status=5xx 持续升高。",
+    "expected_file": "resource-community-error-rate.md"
+  },
+  {
+    "id": "log-001",
+    "question": "后端日志出现 level=WARN latency_ms=812 path=/api/articles/:id，怀疑详情缓存未命中或 MySQL 查询变慢。",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "log-002",
+    "question": "Worker 日志反复出现 process async job failed、idempotency complete failed，同时 RabbitMQ 队列 ready 持续增加。",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "colloquial-001",
+    "question": "服务突然变慢了，所有接口响应都很慢，应该先查什么？",
+    "expected_file": "resource-community-p95-latency.md"
+  },
+  {
+    "id": "colloquial-002",
+    "question": "热榜半天不更新是怎么回事？",
+    "expected_file": "resource-community-hot-ranking.md"
+  },
+  {
+    "id": "colloquial-003",
+    "question": "消息队列堆积了好多消息，一直消费不完怎么办？",
+    "expected_file": "resource-community-rabbitmq-backlog.md"
+  },
+  {
+    "id": "neg-001",
+    "question": "今天上海天气怎么样？",
+    "expected_file": null
+  },
+  {
+    "id": "neg-002",
+    "question": "Kubernetes 集群节点如何扩容？",
+    "expected_file": null
+  },
+  {
+    "id": "neg-003",
+    "question": "如何配置 Grafana 的告警通知渠道？",
+    "expected_file": null
   }
 ]
