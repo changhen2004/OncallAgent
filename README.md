@@ -74,7 +74,7 @@ docker compose -f docker-compose.prometheus.yml up -d
 | `server.host/port` | HTTP 服务地址（默认 8819） |
 | `openai.*` | OpenAI 兼容 API；配置 `api_key` 后启用 ChatAgent 工具调用 |
 | `prometheus.url` | Prometheus 地址；接入 GoCommunity 可观测平台时改为 `http://localhost:9091` |
-| `embedder.*` / `qdrant.*` | 外部向量索引；仅开启外部索引时使用 |
+| `embedder.*` / `qdrant.*` | 外部向量索引参数（当前由 `create_app(enable_external_indexing=True)` 开启） |
 | `storage.database_url` | PostgreSQL 连接串；留空则纯内存运行 |
 | `cls_mcp.*` | MCP/SSE 外部工具地址与开关 |
 
@@ -93,8 +93,9 @@ docker compose -f docker-compose.prometheus.yml up -d
 ### 1. RAG 检索：面向中文运维场景的命中率优化
 
 - 本地索引对中文采用 **bigram/trigram 连续片段切分**，避免单字拆分带来的泛化噪声；文件名与 Markdown 标题命中加权，日志原文 / 指标类英文短语整段匹配加分
+- Markdown 按 **标题层级切分**、超长章节**重叠二次切分**；向量点携带 `heading` / `source` / `alertname` / 指标元数据，支持按告警过滤
+- 词法结果与 Qdrant 向量结果做 **RRF 混合排序**，外部服务不可用时自动降级词法
 - 用 40 条问题做回归评估：**Top1 97.3%，Top3 100%，MRR 0.987，NDCG@3 0.990，负例误召回 1/3**（见 `docs/evaluation/rag-eval.md`）
-- 可扩展外部索引：开启后通过 Ollama Embedding 分块写入 Qdrant，检索链路可插拔
 
 ### 2. Agent 工具调用治理
 
@@ -121,8 +122,8 @@ docker compose -f docker-compose.prometheus.yml up -d
 ## 测试与评估
 
 ```bash
-uv run pytest                                    # 20 个文件 / 69 个用例
-uv run python scripts/rag_eval.py --format markdown   # RAG TopK 命中率评估
+uv run pytest                                    # 22 个文件 / 101 个用例
+uv run python scripts/rag_eval.py --format markdown   # RAG 检索评估（Top1/Top3/MRR/NDCG@k/负例误召回）
 uv run python scripts/demo_incident_flow.py           # 告警 → Runbook → Agent 演示
 ```
 
@@ -176,7 +177,18 @@ OnCallAgent/
 
 ## 后续优化方向
 
-- **RAG**：扩充评估集（口语化问题、更多日志场景）、引入 rerank 与向量混合检索
-- **工具**：接入更多 MCP 外部工具、工具 Schema 校验与权限边界
-- **治理**：Harness 预算控制、评估指标持续跟踪
-- **部署**：服务容器化与一键 Compose、接入告警事件源（Alertmanager Webhook）
+### 已完成（P0/P1）
+
+- **RAG 混合检索**：词法 + Qdrant 向量 RRF 融合，外部不可用自动降级；`--retriever hybrid` 双路径评估
+- **切分与索引**：按标题层级切分、超长重叠二次切分；payload 携带 `heading` / `source` / `alertname` / 指标元数据，支持按告警过滤
+- **评估体系**：40 条评估集（告警原文、日志片段、口语化提问、负例）；指标覆盖 Top1 / Top3 / MRR / NDCG@k / 负例误召回率
+- **工具治理**：统一 Tool 接口，超时、异常分类、Schema 校验与调用审计
+- **Harness 预算控制**：`max_iterations` / `max_tool_calls` / `max_duration` 与停止原因记录
+
+### 待办（P2）
+
+- **RAG 检索**：引入 rerank 二阶段排序；alertname / 指标 payload filter 接入 Agent 工具与 Plan 链路；查询改写与停用词压制负例误召回
+- **索引生命周期**：按 `source` 删除旧 chunk、内容 hash 去重、增量更新；嵌入批量并发与重试
+- **可观测性**：应用暴露 `/metrics`（检索延迟、命中率、工具成功率），评估指标持续跟踪与 CI 回归门槛
+- **工具与 Agent**：接入更多 MCP 外部工具、工具权限边界与结果截断
+- **部署与事件接入**：应用容器化与一键 Compose；接入 Alertmanager Webhook 告警事件源；外部索引改为配置项驱动
