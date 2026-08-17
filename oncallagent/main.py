@@ -17,6 +17,7 @@ from oncallagent.infra.factory import (
     build_optional_embedder,
     build_optional_external_indexer,
     build_optional_lazy_store,
+    build_optional_plan_agent,
     build_optional_vector_store,
 )
 from oncallagent.knowledge.index import KnowledgeIndex
@@ -33,7 +34,7 @@ def create_app(
     docs_dir: str | Path = "docs/runbooks",
     config_path: str | Path | None = None,
     prometheus_url: str | None = None,
-    enable_external_indexing: bool = False,
+    enable_external_indexing: bool = True,
 ) -> FastAPI:
     config = load_config(config_path)
     embedder = build_optional_embedder(config) if enable_external_indexing else None
@@ -51,7 +52,12 @@ def create_app(
     lazy_store = build_optional_lazy_store(config)
     chat_agent = build_optional_chat_agent(config, knowledge, storage=lazy_store)
     chat_service = ChatService(knowledge, agent=chat_agent, storage=lazy_store)
-    plan_service = PlanService(prometheus_url or config.prometheus.url, knowledge)
+    plan_agent = build_optional_plan_agent(config, chat_agent, storage=lazy_store)
+    plan_service = PlanService(
+        prometheus_url or config.prometheus.url,
+        knowledge,
+        agent=plan_agent,
+    )
 
     # Lifespan: only used to close the pool on shutdown.
     @asynccontextmanager

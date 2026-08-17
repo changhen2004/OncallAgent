@@ -196,7 +196,7 @@ class PostgresStore:
                 "VALUES ($1, $2, $3, $4, $5, $6) "
                 "ON CONFLICT (id) DO NOTHING",
                 evidence.id,
-                evidence.source,
+                evidence.run_id,
                 evidence.type.value,
                 evidence.source,
                 evidence.summary,

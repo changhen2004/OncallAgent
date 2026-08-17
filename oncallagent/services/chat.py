@@ -2,14 +2,21 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import AsyncIterator
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from oncallagent.knowledge.index import KnowledgeIndex
 from oncallagent.storage.store import ConversationStore
 
 
+@runtime_checkable
 class AgentChat(Protocol):
     async def chat(self, question: str, session_id: str) -> str:
+        pass
+
+
+@runtime_checkable
+class StreamingAgentChat(AgentChat, Protocol):
+    def stream_chat(self, question: str, session_id: str) -> AsyncIterator[str]:
         pass
 
 
@@ -45,6 +52,12 @@ class ChatService:
         return answer
 
     async def stream_chat(self, question: str, session_id: str) -> AsyncIterator[str]:
+        if isinstance(self.agent, StreamingAgentChat):
+            async for chunk in self.agent.stream_chat(question, session_id):
+                yield chunk
+            return
+
+        yield "正在检索知识库...\n"
         answer = await self.chat(question, session_id)
         for chunk in _chunk_text(answer, size=48):
             yield chunk

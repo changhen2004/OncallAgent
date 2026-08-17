@@ -3,6 +3,8 @@ import pytest
 from oncallagent.agent.chat_agent import ChatAgent, ChatMemory
 from oncallagent.agent.harness import RunStatus, StopReason
 from oncallagent.infra.llm import ChatMessage
+from oncallagent.knowledge.index import KnowledgeIndex
+from oncallagent.services.chat import ChatService
 
 
 def test_chat_memory_keeps_last_window_messages() -> None:
@@ -109,3 +111,23 @@ async def test_chat_agent_run_stops_with_budget_reason_when_iterations_exhausted
     assert result.state.stop_reason == StopReason.BUDGET_EXCEEDED
     assert result.state.usage.iterations == 1
     assert result.state.usage.tool_calls == 1
+
+
+@pytest.mark.anyio
+async def test_chat_service_uses_agent_stream_without_waiting_for_full_answer(tmp_path) -> None:
+    class StreamingAgent:
+        async def chat(self, question: str, session_id: str) -> str:
+            return "full answer"
+
+        async def stream_chat(self, question: str, session_id: str):
+            yield "first chunk"
+            yield "second chunk"
+
+    service = ChatService(KnowledgeIndex(tmp_path), agent=StreamingAgent())
+
+    stream = service.stream_chat("question", "s1")
+    first = await anext(stream)
+    second = await anext(stream)
+
+    assert first == "first chunk"
+    assert second == "second chunk"

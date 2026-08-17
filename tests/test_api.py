@@ -82,6 +82,7 @@ def test_chat_stream_emits_sse_chunks_and_done(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "data:" in body
     assert "data: [DONE]" in body
+    assert body.startswith("data: 正在检索知识库")
 
 
 def test_plan_returns_degraded_report_when_prometheus_unavailable(tmp_path: Path) -> None:
@@ -100,3 +101,23 @@ def test_plan_returns_degraded_report_when_prometheus_unavailable(tmp_path: Path
     assert payload["message"] == "获取运维信息成功"
     assert "lastmsg" in payload["data"]
     assert isinstance(payload["data"]["msgs"], list)
+
+
+def test_create_app_enables_external_indexing_by_default(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    calls: list[bool] = []
+
+    def fake_external_indexer(config, *, enabled, embedder, vector_store):
+        calls.append(enabled)
+        return None
+
+    monkeypatch.setattr(
+        "oncallagent.main.build_optional_external_indexer",
+        fake_external_indexer,
+    )
+
+    create_app(docs_dir=tmp_path, config_path=make_test_config(tmp_path))
+
+    assert calls == [True]

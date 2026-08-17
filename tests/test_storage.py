@@ -14,7 +14,7 @@ from oncallagent.agent.harness import (
     ToolCallStatus,
 )
 from oncallagent.infra.llm import ChatMessage
-from oncallagent.storage.store import ConversationStore
+from oncallagent.storage.store import ConversationStore, PostgresStore
 
 
 # ------------------------------------------------------------------- Fake Store
@@ -80,6 +80,36 @@ class FakeConversationStore:
         self.chat_history.append(
             {"session_id": session_id, "question": question, "answer": answer}
         )
+
+    async def close(self) -> None:
+        pass
+
+
+class FakePostgresConnection:
+    def __init__(self) -> None:
+        self.executions: list[tuple[str, tuple]] = []
+
+    async def execute(self, sql: str, *args) -> None:
+        self.executions.append((sql, args))
+
+
+class FakePoolAcquire:
+    def __init__(self, conn: FakePostgresConnection) -> None:
+        self.conn = conn
+
+    async def __aenter__(self) -> FakePostgresConnection:
+        return self.conn
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        pass
+
+
+class FakePostgresPool:
+    def __init__(self) -> None:
+        self.conn = FakePostgresConnection()
+
+    def acquire(self) -> FakePoolAcquire:
+        return FakePoolAcquire(self.conn)
 
     async def close(self) -> None:
         pass
@@ -258,3 +288,24 @@ def test_plan_agent_persists_run_state() -> None:
     assert len(store.agent_runs) == 1
     assert store.agent_runs[0]["goal"] == "分析告警"
     assert store.agent_runs[0]["status"] == RunStatus.STOPPED
+
+
+@pytest.mark.anyio
+async def test_postgres_store_persists_evidence_with_run_id() -> None:
+    pool = FakePostgresPool()
+    store = PostgresStore(pool)
+
+    await store.save_evidence(
+        Evidence(
+            id="e1",
+            type=EvidenceType.ALERT,
+            source="prometheus",
+            summary="firing",
+            run_id="inc-1",
+        )
+    )
+
+    _, args = pool.conn.executions[0]
+    assert args[0] == "e1"
+    assert args[1] == "inc-1"
+    assert args[3] == "prometheus"

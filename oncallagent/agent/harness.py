@@ -60,6 +60,7 @@ class Evidence:
     source: str
     summary: str
     score: float = 0.0
+    run_id: str = ""
     created_at: datetime | None = None
 
 
@@ -115,6 +116,8 @@ class AgentState:
     def add_evidence(self, evidence: Evidence) -> None:
         if evidence.created_at is None:
             evidence.created_at = datetime.now(timezone.utc)
+        if not evidence.run_id:
+            evidence.run_id = self.incident_id
         self.evidence.append(evidence)
         self.updated_at = datetime.now(timezone.utc)
 

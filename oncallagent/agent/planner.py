@@ -174,6 +174,8 @@ class PlanExecuteReplanAgent:
         if self.storage is None:
             return
         for evidence in state.evidence:
+            if not evidence.run_id:
+                evidence.run_id = state.incident_id
             await self.storage.save_evidence(evidence)
         await self.storage.save_agent_run(state)
 

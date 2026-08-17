@@ -57,5 +57,6 @@ def test_agent_state_records_evidence_tool_calls_and_stop_reason() -> None:
     assert state.status == RunStatus.STOPPED
     assert state.stop_reason == StopReason.COMPLETED
     assert len(state.evidence) == 1
+    assert state.evidence[0].run_id == "inc-1"
     assert len(state.tool_calls) == 1
     assert state.usage.tool_calls == 1

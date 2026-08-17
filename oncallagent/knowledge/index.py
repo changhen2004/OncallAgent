@@ -47,7 +47,10 @@ class KnowledgeIndex:
         target.write_bytes(content)
         markdown = content.decode("utf-8", errors="ignore")
         if self.external_indexer is not None:
-            await self.external_indexer.index_markdown(markdown, source=filename)
+            try:
+                await self.external_indexer.index_markdown(markdown, source=filename)
+            except Exception:
+                logger.exception("external indexing failed for uploaded file %s", filename)
         self._documents[filename] = markdown
         return "上传成功"
 

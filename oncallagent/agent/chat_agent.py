@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -82,6 +83,12 @@ class ChatAgent:
     async def chat(self, question: str, session_id: str) -> str:
         result = await self.run(question, session_id=session_id)
         return result.answer
+
+    async def stream_chat(self, question: str, session_id: str) -> AsyncIterator[str]:
+        yield "正在分析问题并调用可用工具...\n"
+        result = await self.run(question, session_id=session_id)
+        for chunk in _chunk_text(result.answer, size=48):
+            yield chunk
 
     async def run(
         self, question: str, session_id: str, incident_id: str | None = None
@@ -224,3 +231,7 @@ class ChatAgent:
         else:
             arguments = raw_arguments
         return ToolCall(id=call.get("id", ""), name=call.get("name", ""), arguments=arguments)
+
+
+def _chunk_text(text: str, size: int) -> list[str]:
+    return [text[index : index + size] for index in range(0, len(text), size)] or [""]
