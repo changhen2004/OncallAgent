@@ -4,13 +4,13 @@
 
 ## 核心能力
 
-- **RAG 知识库**：Markdown 运维手册按标题层级切分、超长重叠二次切分；可选 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
+- **RAG 知识库**：Markdown 运维手册按标题层级切分、超长重叠二次切分；标准启动默认装配 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
 - **工具调用**：内置时间 / 知识库检索 / Prometheus 告警工具，支持 OpenAI 兼容模型函数调用
 - **告警计划分析**：Plan-Execute-Replan 工作流，自动获取活跃告警、命中 runbook、生成处理建议
-- **流式对话**：SSE 多轮会话，支持知识库命中回复与工具调用轨迹
-- **会话持久化**：可选 PostgreSQL 持久化对话消息、工具调用审计与 Agent Run 状态
-- **降级可用**：Prometheus / PostgreSQL / LLM 任一不可用时自动降级，本地开箱即跑
-- **可验证**：22 个测试文件 / 101 个 pytest 用例 + 40 条 RAG 评估集（告警原文、日志、口语化与负例，词法 + 混合双路径）
+- **流式对话**：SSE 多轮会话优先走 Agent 流式接口，降级路径也会先返回检索进度块
+- **会话持久化**：可选 PostgreSQL 持久化对话消息、工具调用审计、Agent Run 状态与 Evidence run_id 关联
+- **降级可用**：Prometheus / PostgreSQL / LLM / Qdrant / Ollama 任一不可用时自动降级，本地开箱即跑
+- **可验证**：22 个测试文件 / 105 个 pytest 用例 + 40 条 RAG 评估集（告警原文、日志、口语化与负例，词法 + 混合双路径）
 
 ## 架构
 
@@ -43,7 +43,7 @@
 - Python 3.11+ 与 [uv](https://docs.astral.sh/uv/)
 - Prometheus（可选，用于告警分析；本仓库 Compose 默认 `http://localhost:9090`，接入 GoCommunity 时使用 `http://localhost:9091`）
 - OpenAI 兼容 API Key（可选；未配置时使用本地知识库降级回复）
-- Ollama + Qdrant（可选；仅开启外部向量索引时需要）
+- Ollama + Qdrant（可选；标准启动会默认尝试装配外部向量索引，服务不可用时降级到本地词法检索）
 - PostgreSQL（可选；用于会话与审计持久化）
 - MCP/SSE 服务（可选；用于接入外部日志工具）
 
@@ -74,7 +74,7 @@ docker compose -f docker-compose.prometheus.yml up -d
 | `server.host/port` | HTTP 服务地址（默认 8819） |
 | `openai.*` | OpenAI 兼容 API；配置 `api_key` 后启用 ChatAgent 工具调用 |
 | `prometheus.url` | Prometheus 地址；接入 GoCommunity 可观测平台时改为 `http://localhost:9091` |
-| `embedder.*` / `qdrant.*` | 外部向量索引参数（当前由 `create_app(enable_external_indexing=True)` 开启） |
+| `embedder.*` / `qdrant.*` | 外部向量索引参数；`create_app()` 默认启用装配，可用 `enable_external_indexing=False` 显式关闭 |
 | `storage.database_url` | PostgreSQL 连接串；留空则纯内存运行 |
 | `cls_mcp.*` | MCP/SSE 外部工具地址与开关 |
 
@@ -83,10 +83,10 @@ docker compose -f docker-compose.prometheus.yml up -d
 | 端点 | 说明 |
 |---|---|
 | `GET /ping` | 健康检查 |
-| `POST /upload` | 上传 Markdown 到 `docs/runbooks/` 并重建知识库索引 |
+| `POST /upload` | 上传 Markdown 到 `docs/runbooks/`，更新本地索引并 best-effort 写入外部向量索引 |
 | `POST /chat` | 非流式对话（`question` + 会话 `id`） |
-| `POST /chatStream` | SSE 流式对话 |
-| `GET /plan` | 查询 Prometheus 活跃告警，匹配知识库并生成排障报告 |
+| `POST /chatStream` | SSE 流式对话；Agent 可用时走 Agent stream，否则先返回检索进度再输出降级答案 |
+| `GET /plan` | 查询 Prometheus 活跃告警；配置 LLM 时进入 Plan-Execute-Replan，否则使用知识库降级报告 |
 
 ## 核心设计
 
@@ -94,7 +94,7 @@ docker compose -f docker-compose.prometheus.yml up -d
 
 - 本地索引对中文采用 **bigram/trigram 连续片段切分**，避免单字拆分带来的泛化噪声；文件名与 Markdown 标题命中加权，日志原文 / 指标类英文短语整段匹配加分
 - Markdown 按 **标题层级切分**、超长章节**重叠二次切分**；向量点携带 `heading` / `source` / `alertname` / 指标元数据，支持按告警过滤
-- 词法结果与 Qdrant 向量结果做 **RRF 混合排序**，外部服务不可用时自动降级词法
+- 标准应用默认装配 Qdrant 向量检索；词法结果与向量结果做 **RRF 混合排序**，外部服务不可用时自动降级词法
 - 用 40 条问题做回归评估：**Top1 97.3%，Top3 100%，MRR 0.987，NDCG@3 0.990，负例误召回 1/3**（见 `docs/evaluation/rag-eval.md`）
 
 ### 2. Agent 工具调用治理
@@ -105,24 +105,24 @@ docker compose -f docker-compose.prometheus.yml up -d
 
 ### 3. Plan-Execute-Replan 告警分析
 
-- `PlanService` 查询 Prometheus `/api/v1/alerts`，识别 firing 告警并去重
-- 命中知识库 runbook 生成处理建议；配置 LLM 后由 `PlanExecuteReplanAgent` 编排“计划 → 执行 → 重规划”
+- `PlanService` 查询 Prometheus `/api/v1/alerts`，识别 firing 告警并去重，再将告警摘要转成 P-E-R 目标
+- 配置 LLM 后由 `PlanExecuteReplanAgent` 编排“计划 → 执行 → 重规划”；未配置 LLM 时命中知识库 runbook 生成降级处理建议
 - Prometheus 不可用时返回**降级检查清单**，保证功能不中断
 
 ### 4. 会话与审计持久化（可选）
 
 - 基于 `ConversationStore` Protocol 注入 `PostgresStore`，`create_app()` 保持同步、连接池懒加载
-- 持久化内容：会话消息滑动窗口（重启自动恢复）、工具调用审计、Agent Run 状态（`AgentState` + `Evidence`）
+- 持久化内容：会话消息滑动窗口（重启自动恢复）、工具调用审计、Agent Run 状态（`AgentState` + `Evidence`），Evidence 使用 `run_id` 关联所属 run
 - 迁移由 `migrations.py` 按版本自动执行；不配置 `database_url` 时完全回退纯内存模式
 
 ### 5. 降级可用设计
 
-所有外部依赖均可选：无 LLM 用知识库检索回复、无 Prometheus 用降级清单、无 PostgreSQL 用内存存储，保证本地开发与演示场景开箱即用。
+所有外部依赖均可选：无 LLM 用知识库检索回复、无 Prometheus 用降级清单、无 PostgreSQL 用内存存储、无 Qdrant/Ollama 用本地词法检索，保证本地开发与演示场景开箱即用。
 
 ## 测试与评估
 
 ```bash
-uv run pytest                                    # 22 个文件 / 101 个用例
+uv run pytest                                    # 22 个文件 / 105 个用例
 uv run python scripts/rag_eval.py --format markdown   # RAG 检索评估（Top1/Top3/MRR/NDCG@k/负例误召回）
 uv run python scripts/demo_incident_flow.py           # 告警 → Runbook → Agent 演示
 ```
@@ -188,7 +188,7 @@ OnCallAgent/
 ### 待办（P2）
 
 - **RAG 检索**：引入 rerank 二阶段排序；alertname / 指标 payload filter 接入 Agent 工具与 Plan 链路；查询改写与停用词压制负例误召回
-- **索引生命周期**：按 `source` 删除旧 chunk、内容 hash 去重、增量更新；嵌入批量并发与重试
+- **索引生命周期**：按 `source` 删除旧 chunk、内容 hash 去重、增量更新；嵌入批量并发与重试；外部索引健康状态可观测
 - **可观测性**：应用暴露 `/metrics`（检索延迟、命中率、工具成功率），评估指标持续跟踪与 CI 回归门槛
 - **工具与 Agent**：接入更多 MCP 外部工具、工具权限边界与结果截断
-- **部署与事件接入**：应用容器化与一键 Compose；接入 Alertmanager Webhook 告警事件源；外部索引改为配置项驱动
+- **部署与事件接入**：应用容器化与一键 Compose；接入 Alertmanager Webhook 告警事件源
