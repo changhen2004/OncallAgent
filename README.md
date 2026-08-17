@@ -1,151 +1,162 @@
-# OnCallAgent — AIOps 智能排障 Agent
+# OnCallAgent: AIOps 智能排障 Agent
 
-面向云服务故障场景的智能运维值班代理：把“Prometheus 告警 + 实时指标 + 内部排障文档”串成一条从告警发现、知识检索到处理建议生成的自动化分析链路，帮助值班人员快速定位故障并产出可执行的排障方案。
+OnCallAgent 是一个 FastAPI 版智能运维值班代理，把 Prometheus 告警、实时指标、内部 runbook、RAG 检索和可选 LLM 工具调用组合成排障分析流程。它可以独立使用，也可以接入 [GoCommunity](https://github.com/changhen2004/resource_community_go) 的 Prometheus 指标和告警，演示从业务异常到排障建议的闭环。
 
 ## 核心能力
 
-- **RAG 知识库**：Markdown 运维手册按标题层级切分、超长重叠二次切分；标准启动默认装配 Ollama Embedding + Qdrant 向量检索，并与词法结果做 RRF 混合排序
-- **工具调用**：内置时间 / 知识库检索 / Prometheus 告警工具，支持 OpenAI 兼容模型函数调用
-- **告警计划分析**：Plan-Execute-Replan 工作流，自动获取活跃告警、命中 runbook、生成处理建议
-- **流式对话**：SSE 多轮会话优先走 Agent 流式接口，降级路径也会先返回检索进度块
-- **会话持久化**：可选 PostgreSQL 持久化对话消息、工具调用审计、Agent Run 状态与 Evidence run_id 关联
-- **降级可用**：Prometheus / PostgreSQL / LLM / Qdrant / Ollama 任一不可用时自动降级，本地开箱即跑
-- **可验证**：22 个测试文件 / 105 个 pytest 用例 + 40 条 RAG 评估集（告警原文、日志、口语化与负例，词法 + 混合双路径）
+- 兼容原始 API：`GET /ping`、`POST /upload`、`POST /chat`、`POST /chatStream`、`GET /plan`。
+- RAG 知识库：读取 `docs/runbooks/*.md`，按中文 bigram / trigram、文件名、标题和短语匹配做本地检索。
+- 混合检索：可选 Ollama Embedding + Qdrant 向量检索，与本地词法检索通过 RRF 融合。
+- 告警分析：`/plan` 查询 Prometheus `/api/v1/alerts`，识别 firing 告警并匹配 runbook；配置 LLM 后进入 Plan-Execute-Replan 工作流。
+- 工具调用：ChatAgent 可调用时间、知识库检索和 Prometheus 告警工具；工具层包含超时、参数校验、异常捕获和审计记录。
+- 流式对话：`/chatStream` 以 SSE 返回，Agent 可用时走 Agent 流式路径，否则先输出检索进度再返回降级答案。
+- 可选持久化：配置 PostgreSQL 后保存会话消息、工具调用记录、Agent Run 和 Evidence；未配置时使用内存会话。
+- 降级可用：没有 OpenAI 兼容模型、Prometheus、PostgreSQL、Qdrant 或 Ollama 时，核心接口仍可用并返回知识库或检查清单。
+- 评估与演示：内置 pytest、RAG 评估集、离线 incident flow，以及本地 Prometheus 测试服务。
 
 ## 架构
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│                     OnCallAgent (FastAPI)                   │
-├────────────────────────────────────────────────────────────┤
-│  API：/ping /upload /chat /chatStream(SSE) /plan            │
-├────────────────────────────────────────────────────────────┤
-│  Services：ChatService / ChatAgent        PlanService /     │
-│            PlanExecuteReplanAgent                          │
-├────────────────────────────────────────────────────────────┤
-│  Knowledge：KnowledgeIndex（本地检索 + RRF 混合）            │
-│             ExternalKnowledgeIndexer（Ollama + Qdrant）     │
-├────────────────────────────────────────────────────────────┤
-│  Tools：TimeTool / KnowledgeSearchTool / PrometheusAlerts   │
-│         Tool / MCPTool（MCP/SSE 外部工具）                  │
-├────────────────────────────────────────────────────────────┤
-│  Storage：ConversationStore Protocol → PostgresStore（可选）│
-├────────────────────────────────────────────────────────────┤
-│  Integrations：OpenAI 兼容 API / Prometheus / Ollama /      │
-│                Qdrant / MCP/SSE                            │
-└────────────────────────────────────────────────────────────┘
+FastAPI
+  |-- /ping
+  |-- /upload: Markdown runbook 入库
+  |-- /chat: ChatService / ChatAgent
+  |-- /chatStream: SSE
+  |-- /plan: PlanService / PlanExecuteReplanAgent
+
+KnowledgeIndex
+  |-- 本地词法检索
+  |-- 可选 QdrantVectorStore + OllamaEmbeddingService
+  |-- search_hybrid 使用 RRF 合并结果
+
+Tools
+  |-- TimeTool
+  |-- KnowledgeSearchTool
+  |-- PrometheusAlertsTool
+  |-- MCPTool / MCPClient
+
+Storage
+  |-- 默认内存
+  |-- 可选 LazyPostgresStore + migrations
 ```
 
 ## 快速开始
 
-### 前置依赖
-
-- Python 3.11+ 与 [uv](https://docs.astral.sh/uv/)
-- Prometheus（可选，用于告警分析；本仓库 Compose 默认 `http://localhost:9090`，接入 GoCommunity 时使用 `http://localhost:9091`）
-- OpenAI 兼容 API Key（可选；未配置时使用本地知识库降级回复）
-- Ollama + Qdrant（可选；标准启动会默认尝试装配外部向量索引，服务不可用时降级到本地词法检索）
-- PostgreSQL（可选；用于会话与审计持久化）
-- MCP/SSE 服务（可选；用于接入外部日志工具）
-
-### 安装与启动
+项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖，需要 Python 3.11+。
 
 ```bash
-git clone <repository-url> && cd OnCallAgent
+git clone <repository-url>
+cd OnCallAgent
 uv sync
-
-# 配置文件（可选）：默认读取 config/config.json，缺失时自动回退 config/config_template.json
 cp config/config_template.json config/config.json
+```
 
+如果只想本地降级运行，请把 `config/config.json` 中的 `openai.api_key` 改为空字符串。模板里的 `xxx` 是占位符；只要该字段非空，应用就会按“已配置 LLM”装配 ChatAgent 和 Plan Agent。
+
+启动服务：
+
+```bash
 uv run uvicorn oncallagent.main:app --host localhost --port 8819
 ```
 
-启动 Prometheus 测试环境：
+检查服务：
+
+```bash
+curl http://localhost:8819/ping
+```
+
+返回 `{"message":"pong"}` 表示 API 已就绪。
+
+## 可选依赖
+
+| 依赖 | 用途 | 不可用时行为 |
+|---|---|---|
+| OpenAI 兼容 API | ChatAgent 工具调用、Plan-Execute-Replan | `/chat` 使用知识库降级回复，`/plan` 使用规则化 runbook 命中 |
+| Prometheus | `/plan` 查询活跃告警 | 返回 Prometheus 不可用的降级检查清单 |
+| Ollama | 生成文档和查询 embedding | 外部索引失败会记录日志，检索回退本地词法 |
+| Qdrant | 向量索引和向量检索 | 混合检索回退本地词法 |
+| PostgreSQL | 会话、工具审计、Agent Run、Evidence 持久化 | 使用内存会话，不持久化 |
+| MCP/SSE 服务 | 接入外部工具 | `build_mcp_tools` 返回可用 MCP 工具，未调用时不影响主流程 |
+
+启动仓库自带的 Prometheus / Grafana / 测试指标服务：
 
 ```bash
 docker compose -f docker-compose.prometheus.yml up -d
 ```
 
-服务地址：`http://localhost:8819`；`/ping` 返回 `{"message": "pong"}` 即就绪。
+| 服务 | 地址 |
+|---|---|
+| OnCallAgent | http://localhost:8819 |
+| Prometheus 测试环境 | http://localhost:9090 |
+| Grafana | http://localhost:3000，默认 `admin/admin` |
+| 测试指标服务 | http://localhost:2112/metrics |
 
-## 配置说明
+接入 GoCommunity 时，将 `config/config.json` 的 `prometheus.url` 改为 `http://localhost:9091`。
+
+## 配置
+
+默认加载 `config/config.json`；如果文件不存在，则回退到 `config/config_template.json`；两者都不存在时使用代码默认值。
 
 | 配置项 | 说明 |
 |---|---|
-| `server.host/port` | HTTP 服务地址（默认 8819） |
-| `openai.*` | OpenAI 兼容 API；配置 `api_key` 后启用 ChatAgent 工具调用 |
-| `prometheus.url` | Prometheus 地址；接入 GoCommunity 可观测平台时改为 `http://localhost:9091` |
-| `embedder.*` / `qdrant.*` | 外部向量索引参数；`create_app()` 默认启用装配，可用 `enable_external_indexing=False` 显式关闭 |
-| `storage.database_url` | PostgreSQL 连接串；留空则纯内存运行 |
-| `cls_mcp.*` | MCP/SSE 外部工具地址与开关 |
+| `server.host` / `server.port` | 服务监听配置，默认 `localhost:8819` |
+| `openai.api_key` | OpenAI 兼容 API Key；为空则不装配 LLM Agent |
+| `openai.model` / `openai.api_base` | OpenAI 兼容模型和接口地址 |
+| `prometheus.url` | Prometheus 地址，默认 `http://localhost:9090` |
+| `embedder.*` | Ollama embedding 服务、模型、维度和 query / passage 前缀 |
+| `qdrant.*` | Qdrant 地址、collection、top_k 和 score_threshold |
+| `storage.database_url` | PostgreSQL 连接串；为空则关闭持久化 |
+| `cls_mcp.base_url` / `cls_mcp.enabled` | MCP/SSE 外部工具配置 |
 
-## API 一览
+`create_app(enable_external_indexing=True)` 默认会在应用生命周期启动时尝试把 `docs/runbooks/` 重建到外部向量索引；失败会逐文件记录日志，不阻断本地词法检索。
 
-| 端点 | 说明 |
-|---|---|
-| `GET /ping` | 健康检查 |
-| `POST /upload` | 上传 Markdown 到 `docs/runbooks/`，更新本地索引并 best-effort 写入外部向量索引 |
-| `POST /chat` | 非流式对话（`question` + 会话 `id`） |
-| `POST /chatStream` | SSE 流式对话；Agent 可用时走 Agent stream，否则先返回检索进度再输出降级答案 |
-| `GET /plan` | 查询 Prometheus 活跃告警；配置 LLM 时进入 Plan-Execute-Replan，否则使用知识库降级报告 |
+## API
 
-## 核心设计
+| 方法 | 路径 | 请求 | 返回 |
+|---|---|---|---|
+| `GET` | `/ping` | 无 | `{"message":"pong"}` |
+| `POST` | `/upload` | multipart 文件字段 `file` | 保存到 `docs/runbooks/` 并更新索引 |
+| `POST` | `/chat` | `{"question":"...","id":"session-id"}` | `{"message":"..."}` |
+| `POST` | `/chatStream` | `{"question":"...","id":"session-id"}` | SSE，结束事件为 `data: [DONE]` |
+| `GET` | `/plan` | 无 | `{"message":"获取运维信息成功","data":{"lastmsg":"...","msgs":[...]}}` |
 
-### 1. RAG 检索：面向中文运维场景的命中率优化
+请求校验失败统一返回 `400` 和 `{"message":"invalid request"}`。
 
-- 本地索引对中文采用 **bigram/trigram 连续片段切分**，避免单字拆分带来的泛化噪声；文件名与 Markdown 标题命中加权，日志原文 / 指标类英文短语整段匹配加分
-- Markdown 按 **标题层级切分**、超长章节**重叠二次切分**；向量点携带 `heading` / `source` / `alertname` / 指标元数据，支持按告警过滤
-- 标准应用默认装配 Qdrant 向量检索；词法结果与向量结果做 **RRF 混合排序**，外部服务不可用时自动降级词法
-- 用 40 条问题做回归评估：**Top1 97.3%，Top3 100%，MRR 0.987，NDCG@3 0.990，负例误召回 1/3**（见 `docs/evaluation/rag-eval.md`）
+## RAG 与 Agent 实现
 
-### 2. Agent 工具调用治理
+`KnowledgeIndex` 启动时加载 `docs/runbooks/*.md`。本地检索会对中文生成 bigram / trigram，对英文、指标名和文件名保留词元，并额外提升 Markdown 标题、文件名和连续短语命中权重。
 
-- 统一 Tool 接口，内置 `TimeTool` / `KnowledgeSearchTool` / `PrometheusAlertsTool` / `MCPTool`
-- 每次工具调用具备超时控制、异常捕获、参数校验与失败降级，并实时写入审计记录
-- Harness 记录 Agent Run 的目标、执行轨迹、工具调用次数与停止原因，支撑故障复盘与效果优化
+外部向量索引由 `OllamaEmbeddingService`、`QdrantVectorStore` 和 `ExternalKnowledgeIndexer` 组成。Markdown 会按标题层级切分，超长内容带重叠拆分，payload 包含 `heading`、`source`、`alertname` 和 `metrics` 等元数据。`search_hybrid` 在向量检索可用时使用 RRF 合并词法和向量结果；向量服务异常时回退词法结果。
 
-### 3. Plan-Execute-Replan 告警分析
-
-- `PlanService` 查询 Prometheus `/api/v1/alerts`，识别 firing 告警并去重，再将告警摘要转成 P-E-R 目标
-- 配置 LLM 后由 `PlanExecuteReplanAgent` 编排“计划 → 执行 → 重规划”；未配置 LLM 时命中知识库 runbook 生成降级处理建议
-- Prometheus 不可用时返回**降级检查清单**，保证功能不中断
-
-### 4. 会话与审计持久化（可选）
-
-- 基于 `ConversationStore` Protocol 注入 `PostgresStore`，`create_app()` 保持同步、连接池懒加载
-- 持久化内容：会话消息滑动窗口（重启自动恢复）、工具调用审计、Agent Run 状态（`AgentState` + `Evidence`），Evidence 使用 `run_id` 关联所属 run
-- 迁移由 `migrations.py` 按版本自动执行；不配置 `database_url` 时完全回退纯内存模式
-
-### 5. 降级可用设计
-
-所有外部依赖均可选：无 LLM 用知识库检索回复、无 Prometheus 用降级清单、无 PostgreSQL 用内存存储、无 Qdrant/Ollama 用本地词法检索，保证本地开发与演示场景开箱即用。
-
-## 测试与评估
-
-```bash
-uv run pytest                                    # 22 个文件 / 105 个用例
-uv run python scripts/rag_eval.py --format markdown   # RAG 检索评估（Top1/Top3/MRR/NDCG@k/负例误召回）
-uv run python scripts/demo_incident_flow.py           # 告警 → Runbook → Agent 演示
-```
-
-- 测试覆盖：API 行为、配置加载、工具调用、告警分析、RAG 检索评估、存储持久化等
-- 评估集：`eval/rag_questions.json`（40 条，含告警原文、日志片段、口语化提问与负例）
+配置 LLM 后，`ChatAgent` 会使用 OpenAI 兼容 `/chat/completions` 接口进行工具调用，最多迭代 8 轮。`/plan` 在存在 firing 告警且 Plan Agent 可用时进入 Plan-Execute-Replan，最多迭代 20 轮；没有 LLM 时按告警摘要检索 runbook 并返回规则化建议。
 
 ## 与 GoCommunity 联动
 
-GoCommunity 提供 Prometheus + Grafana 可观测平台与压测演练脚本，OnCallAgent 将其作为真实业务系统做告警分析演示，形成“业务指标 → 告警 → 知识库 → 分析建议”闭环：
-
-```text
-GoCommunity ──Prometheus──▶ 告警 ──▶ OnCallAgent（RAG + Agent）──▶ 排障建议
-```
-
-仓库已内置对应 runbook（`docs/runbooks/`）：
+GoCommunity 提供真实业务指标、Prometheus 告警、Grafana 面板和压测演练脚本。OnCallAgent 仓库内置了对应 runbook：
 
 | 故障场景 | runbook |
 |---|---|
-| 接口 P95 升高 | `resource-community-p95-latency.md` |
-| 错误率升高 | `resource-community-error-rate.md` |
-| 热榜异常 | `resource-community-hot-ranking.md` |
-| RabbitMQ 积压 | `resource-community-rabbitmq-backlog.md` |
+| 接口 P95 升高 | `docs/runbooks/resource-community-p95-latency.md` |
+| 错误率升高 | `docs/runbooks/resource-community-error-rate.md` |
+| 热榜异常 | `docs/runbooks/resource-community-hot-ranking.md` |
+| RabbitMQ 积压 | `docs/runbooks/resource-community-rabbitmq-backlog.md` |
+
+联动流程：
+
+```text
+GoCommunity /metrics -> Prometheus 告警 -> OnCallAgent /plan -> runbook 命中和排障建议
+```
+
+## 测试、评估与演示
+
+```bash
+uv run pytest
+uv run python scripts/rag_eval.py --format markdown
+uv run python scripts/rag_eval.py --retriever hybrid --format markdown
+uv run python scripts/demo_incident_flow.py
+```
+
+当前测试覆盖 API、配置加载、RAG 检索、混合索引、Qdrant 集成封装、Embedding、工具运行时、ChatAgent、PlanService、Harness、PostgreSQL 存储、Prometheus 测试服务和演示流程。RAG 评估集位于 `eval/rag_questions.json`，评估说明见 `docs/evaluation/rag-eval.md`。
 
 ## 项目结构
 
@@ -153,42 +164,32 @@ GoCommunity ──Prometheus──▶ 告警 ──▶ OnCallAgent（RAG + Agent
 OnCallAgent/
 ├── oncallagent/
 │   ├── main.py               # FastAPI 应用入口与路由
-│   ├── agent/                # chat_agent / planner / harness（工作流编排）
-│   ├── services/             # chat / plan（业务服务）
-│   ├── tools/                # builtin / runtime / mcp（工具层）
-│   ├── knowledge/            # index / indexing / embedding / external / qdrant（RAG）
-│   ├── storage/              # store / migrations（PostgreSQL 持久化）
-│   ├── infra/                # config / llm / factory（基础设施与装配）
-│   └── eval/                 # rag_eval / demo_flow（评估与演示）
-├── tests/                    # pytest 测试
-├── eval/                     # rag_questions.json 评估集
+│   ├── agent/                # ChatAgent、Plan-Execute-Replan、Harness
+│   ├── services/             # chat / plan 服务
+│   ├── tools/                # 内置工具、工具执行器、MCP 工具
+│   ├── knowledge/            # 本地检索、切分、Embedding、Qdrant、混合检索
+│   ├── storage/              # PostgreSQL store 和迁移
+│   ├── infra/                # 配置、LLM、对象装配
+│   └── eval/                 # RAG 评估和 incident demo
 ├── docs/
-│   ├── runbooks/             # 运维知识库（Markdown）
-│   ├── evaluation/           # RAG Eval 与 Agent Run 证据记录
-│   └── development/          # 开发规范文档
-├── config/                   # config.json / config_template.json
-├── scripts/                  # rag_eval.py / demo_incident_flow.py / cls-mcp.sh
-├── prometheus_config/        # Prometheus 配置
-├── prometheusTestServer/     # 本地 Prometheus 测试服务
+│   ├── runbooks/             # 运维知识库
+│   ├── evaluation/           # 评估和 Agent Run 记录
+│   └── development/          # 开发过程文档
+├── tests/                    # pytest 测试
+├── eval/                     # RAG 问题集
+├── config/                   # 配置模板
+├── scripts/                  # 评估、演示、MCP 辅助脚本
+├── prometheus_config/        # Prometheus 规则
+├── prometheusTestServer/     # 本地指标模拟服务
 ├── docker-compose.prometheus.yml
 ├── pyproject.toml
 └── uv.lock
 ```
 
-## 后续优化方向
+## 后续方向
 
-### 已完成（P0/P1）
-
-- **RAG 混合检索**：词法 + Qdrant 向量 RRF 融合，外部不可用自动降级；`--retriever hybrid` 双路径评估
-- **切分与索引**：按标题层级切分、超长重叠二次切分；payload 携带 `heading` / `source` / `alertname` / 指标元数据，支持按告警过滤
-- **评估体系**：40 条评估集（告警原文、日志片段、口语化提问、负例）；指标覆盖 Top1 / Top3 / MRR / NDCG@k / 负例误召回率
-- **工具治理**：统一 Tool 接口，超时、异常分类、Schema 校验与调用审计
-- **Harness 预算控制**：`max_iterations` / `max_tool_calls` / `max_duration` 与停止原因记录
-
-### 待办（P2）
-
-- **RAG 检索**：引入 rerank 二阶段排序；alertname / 指标 payload filter 接入 Agent 工具与 Plan 链路；查询改写与停用词压制负例误召回
-- **索引生命周期**：按 `source` 删除旧 chunk、内容 hash 去重、增量更新；嵌入批量并发与重试；外部索引健康状态可观测
-- **可观测性**：应用暴露 `/metrics`（检索延迟、命中率、工具成功率），评估指标持续跟踪与 CI 回归门槛
-- **工具与 Agent**：接入更多 MCP 外部工具、工具权限边界与结果截断
-- **部署与事件接入**：应用容器化与一键 Compose；接入 Alertmanager Webhook 告警事件源
+- 为混合检索增加 rerank 和更细的 payload filter 接入。
+- 增加索引生命周期管理，例如按 source 删除旧 chunk、内容 hash 去重和增量更新。
+- 为应用自身补充 `/metrics`，跟踪检索延迟、命中率和工具成功率。
+- 扩展 MCP 外部工具、权限边界和结果截断策略。
+- 接入 Alertmanager Webhook，形成更完整的告警事件入口。
