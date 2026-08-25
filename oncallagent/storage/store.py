@@ -6,7 +6,6 @@ from typing import Protocol
 import asyncpg
 
 from oncallagent.agent.harness import AgentState, Evidence, ToolCallRecord, ToolCallStatus
-from oncallagent.infra.llm import ChatMessage
 from oncallagent.storage.migrations import run_migrations
 
 

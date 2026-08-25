@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import AsyncIterator
 from typing import Protocol, runtime_checkable
 
 from oncallagent.knowledge.index import KnowledgeIndex
 from oncallagent.storage.store import ConversationStore
+from oncallagent.utils import chunk_text
 
 
 @runtime_checkable
@@ -30,7 +30,6 @@ class ChatService:
         self.knowledge = knowledge
         self.agent = agent
         self.storage = storage
-        self._memory: dict[str, list[tuple[str, str]]] = defaultdict(list)
 
     async def chat(self, question: str, session_id: str) -> str:
         if self.agent is not None:
@@ -46,7 +45,6 @@ class ChatService:
                 "或补充告警名称、服务名、指标和最近变更信息。"
             )
 
-        self._memory[session_id].append((question, answer))
         if self.storage is not None:
             await self.storage.save_chat_history(session_id, question, answer)
         return answer
@@ -59,9 +57,5 @@ class ChatService:
 
         yield "正在检索知识库...\n"
         answer = await self.chat(question, session_id)
-        for chunk in _chunk_text(answer, size=48):
+        for chunk in chunk_text(answer, size=48):
             yield chunk
-
-
-def _chunk_text(text: str, size: int) -> list[str]:
-    return [text[index : index + size] for index in range(0, len(text), size)] or [""]

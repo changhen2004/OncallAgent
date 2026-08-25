@@ -17,7 +17,8 @@ OnCallAgent 是一个 FastAPI 版智能运维值班代理，把 Prometheus 告�
 ## 架构
 
 ```text
-FastAPI
+FastAPI / create_app
+  |-- _build_components: 统一装配配置、知识库、Agent、存储和服务
   |-- /ping
   |-- /upload: Markdown runbook 入库
   |-- /chat: ChatService / ChatAgent
@@ -34,18 +35,24 @@ Tools
   |-- KnowledgeSearchTool
   |-- PrometheusAlertsTool
   |-- MCPTool / MCPClient
+  |-- ToolExecutor: 参数校验、超时、异常处理和审计
 
 Storage
   |-- 默认内存
   |-- 可选 LazyPostgresStore + migrations
+
+Shared
+  |-- utils.chunk_text: 统一流式文本分块
 ```
+
+应用入口只负责 HTTP 层和生命周期管理，依赖创建集中在 `_build_components`；Agent 运行循环、工具执行、知识库检索和持久化分别由独立模块负责。没有配置外部服务时，各模块沿用本地降级路径，不阻断核心 API。
 
 ## 快速开始
 
 项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖，需要 Python 3.11+。
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/changhen2004/OncallAgent.git
 cd OnCallAgent
 uv sync
 cp config/config_template.json config/config.json
@@ -76,7 +83,7 @@ curl http://localhost:8819/ping
 | Ollama | 生成文档和查询 embedding | 外部索引失败会记录日志，检索回退本地词法 |
 | Qdrant | 向量索引和向量检索 | 混合检索回退本地词法 |
 | PostgreSQL | 会话、工具审计、Agent Run、Evidence 持久化 | 使用内存会话，不持久化 |
-| MCP/SSE 服务 | 接入外部工具 | `build_mcp_tools` 返回可用 MCP 工具，未调用时不影响主流程 |
+| MCP/SSE 服务 | 接入外部工具 | `build_mcp_tools` 可发现并封装 MCP 工具；默认 ChatAgent 工具列表保持稳定，未启用时不影响主流程 |
 
 启动仓库自带的 Prometheus / Grafana / 测试指标服务：
 
@@ -158,12 +165,15 @@ uv run python scripts/demo_incident_flow.py
 
 当前测试覆盖 API、配置加载、RAG 检索、混合索引、Qdrant 集成封装、Embedding、工具运行时、ChatAgent、PlanService、Harness、PostgreSQL 存储、Prometheus 测试服务和演示流程。RAG 评估集位于 `eval/rag_questions.json`，评估说明见 `docs/evaluation/rag-eval.md`。
 
+最近一次重构回归结果：105 个测试全部通过；本地 RAG 评估 Top1 命中率 97.30%、Top3 命中率 100%、MRR 0.9865；离线 incident flow 可识别 3 个 firing 告警并命中对应 runbook。运行环境未启动外部 Prometheus、Qdrant、Ollama、PostgreSQL 或 MCP 服务时，测试使用本地替身和降级路径。
+
 ## 项目结构
 
 ```text
 OnCallAgent/
 ├── oncallagent/
-│   ├── main.py               # FastAPI 应用入口与路由
+│   ├── main.py               # FastAPI 入口、路由与应用生命周期
+│   ├── utils.py              # 公共文本分块等轻量工具
 │   ├── agent/                # ChatAgent、Plan-Execute-Replan、Harness
 │   ├── services/             # chat / plan 服务
 │   ├── tools/                # 内置工具、工具执行器、MCP 工具
@@ -185,6 +195,15 @@ OnCallAgent/
 ├── pyproject.toml
 └── uv.lock
 ```
+
+### 模块职责
+
+- `main.py`：创建 FastAPI 应用、注册路由和管理生命周期；业务依赖由 `_build_components` 统一组装。
+- `agent/`：实现 ChatAgent 的 ReAct 式工具循环、Plan-Execute-Replan 和运行状态治理。
+- `tools/`：定义统一 Tool 协议、内置工具、MCP 适配和带超时/审计的 `ToolExecutor`。
+- `knowledge/`：负责 Markdown 入库、词法检索、向量索引和 RRF 混合检索。
+- `services/`：负责 HTTP 业务用例编排和无 LLM 时的降级行为。
+- `storage/`：提供内存兼容路径和可选 PostgreSQL 持久化。
 
 ## 后续方向
 

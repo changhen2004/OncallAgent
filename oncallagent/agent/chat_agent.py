@@ -9,16 +9,8 @@ from typing import Protocol
 from oncallagent.agent.harness import AgentState, RunBudget, StopReason, ToolCallRecord
 from oncallagent.infra.llm import ChatMessage
 from oncallagent.storage.store import ConversationStore
-from oncallagent.tools.runtime import ToolExecutor
-
-
-class Tool(Protocol):
-    name: str
-    description: str
-    input_schema: dict
-
-    async def call(self, arguments: dict) -> str:
-        pass
+from oncallagent.tools.runtime import Tool, ToolExecutor
+from oncallagent.utils import chunk_text
 
 
 class ToolCallingModel(Protocol):
@@ -87,7 +79,7 @@ class ChatAgent:
     async def stream_chat(self, question: str, session_id: str) -> AsyncIterator[str]:
         yield "正在分析问题并调用可用工具...\n"
         result = await self.run(question, session_id=session_id)
-        for chunk in _chunk_text(result.answer, size=48):
+        for chunk in chunk_text(result.answer, size=48):
             yield chunk
 
     async def run(
@@ -231,7 +223,3 @@ class ChatAgent:
         else:
             arguments = raw_arguments
         return ToolCall(id=call.get("id", ""), name=call.get("name", ""), arguments=arguments)
-
-
-def _chunk_text(text: str, size: int) -> list[str]:
-    return [text[index : index + size] for index in range(0, len(text), size)] or [""]
