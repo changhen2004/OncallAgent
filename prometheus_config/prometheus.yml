@@ -2,6 +2,15 @@ global:
   scrape_interval: 5s
   evaluation_interval: 5s
 
+# 告警链路演练：本测试环境的 firing 告警推送到 GoOnCall-Agent compose 中的
+# Alertmanager（宿主机 9093，通过 host.docker.internal 跨网络访问；
+# prometheus 服务需配置 extra_hosts: host.docker.internal:host-gateway）。
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - host.docker.internal:9093
+
 rule_files:
   - "alert.rules"
 

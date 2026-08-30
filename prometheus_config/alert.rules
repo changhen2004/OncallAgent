@@ -8,6 +8,9 @@ groups:
     labels:
       severity: critical
       team: backend
+      # service 参与 GoOnCall Incident 指纹（labels.service），必须显式声明且跨 firing/resolved 稳定。
+      # 注意：HighLatency 的 by(handler, le) 聚合会丢失 job 标签，不能依赖 job 兜底。
+      service: oncall-test
     annotations:
       summary: "接口 {{ $labels.handler }} 错误率激增"
       description: "接口 {{ $labels.handler }} 当前错误率为 {{ $value }}%，大于阈值 20%。"
@@ -18,6 +21,7 @@ groups:
     for: 10s
     labels:
       severity: warning
+      service: oncall-test
     annotations:
       summary: "接口 {{ $labels.handler }} 响应延迟过高"
       description: "接口 {{ $labels.handler }} 的 P99 延迟达到 {{ $value }} 秒。"
@@ -28,6 +32,7 @@ groups:
     for: 10s
     labels:
       severity: critical
+      service: oncall-test
     annotations:
       summary: "进程 CPU 使用率过高"
       description: "CPU 使用率达到 {{ $value }}%，可能导致服务拒绝响应。"
